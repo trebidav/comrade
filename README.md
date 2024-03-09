@@ -1,4 +1,4 @@
-# The Communist App
+# Comrade
 
 An OpenSource task manager for any community. Gamified.
 
