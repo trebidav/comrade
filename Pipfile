@@ -23,6 +23,10 @@ pre-commit = "==3.6.2"
 pyyaml = "==6.0.1"
 sqlparse = "==0.4.4"
 virtualenv = "==20.25.1"
+isort = "*"
+mypy = "*"
+pytest = "*"
+pytest-cov = "*"
 
 [dev-packages]
 
