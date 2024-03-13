@@ -7,10 +7,22 @@ An OpenSource task manager for any community. Gamified.
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
 
+## Install
 
-Use Black Python Linter in default configuration.
+Use `pipenv` for dependency management 
+```
+brew install pipenv
+```
 
-Use Pipenv for dependency management
+Run `pre-commit` hooks before opening MR
+```
+brew install pre-commit
+```
+
+Run server
+```
+cd comrade ; python manage.py runserver
+```
 
 ## License
 
