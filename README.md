@@ -21,9 +21,12 @@ brew install pre-commit
 
 Run server
 ```
-cd comrade ; python manage.py runserver
+pipenv shell
+pipenv sync
+cd comrade
+python manage.py runserver
 ```
 
 ## License
 
-[GNU GPL 3](https://www.gnu.org/licenses/gpl-3.0.html)
+Comrade © 2024 by David Trebicky is licensed under [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/)
