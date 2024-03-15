@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "rest_framework",
     "rest_framework.authtoken",
+    "daphne",
+    "django_eventstream",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -47,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    "adrf",
 ]
 
 MIDDLEWARE = [
@@ -58,7 +61,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
 ]
+
+CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = "comrade.urls"
 
@@ -67,6 +74,8 @@ TEMPLATES = [
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
             os.path.join(BASE_DIR, "allauth", "templates"),
+            str(BASE_DIR) + "templates/",
+            str(BASE_DIR) + "comrade_core/templates/",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -90,10 +99,11 @@ AUTHENTICATION_BACKENDS = [
 CSRF_TRUSTED_ORIGINS = ["https://knowing-massive-macaw.ngrok-free.app"]
 
 LOGIN_URL = "/accounts/login/"
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http"
 
 
 WSGI_APPLICATION = "comrade.wsgi.application"
+ASGI_APPLICATION = "comrade.asgi.application"
 
 
 # Database
