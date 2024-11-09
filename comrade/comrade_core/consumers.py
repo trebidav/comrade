@@ -6,17 +6,23 @@ from rest_framework.authtoken.models import Token
 
 class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.user = await self.get_user_from_token()
-        
-        if self.user.is_authenticated:
-            self.group_name = f"user_{self.user.id}"
-            await self.channel_layer.group_add(
-                self.group_name,
-                self.channel_name
-            )
-            await self.accept()  # Accept the WebSocket connection
-        else:
-            await self.close()  # Close the connection if not authenticated
+        query_string = self.scope['query_string'].decode()
+        query_params = parse_qs(query_string)
+        self.token = query_params.get('token', [None])[0]
+        try:
+            token = await database_sync_to_async(Token.objects.get)(key=self.token)
+            self.user = await sync_to_async(lambda: token.user)()
+            if self.user.is_authenticated:
+                self.group_name = f"user_{self.user.id}"
+                await self.channel_layer.group_add(
+                    self.group_name,
+                    self.channel_name
+                )
+                await self.accept()  # Accept the WebSocket connection
+            else:
+                await self.close()  # Close the connection if not authenticated
+        except Token.DoesNotExist:
+            await self.close()
 
     async def disconnect(self, close_code):
         if self.group_name:
@@ -45,30 +51,41 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_from_token(self):
-        headers = self.scope['headers']
-        for header in headers:
-            if header[0] == b'authorization':
-                token_name, token_key = header[1].decode().split()
-                if token_name == 'Token':
-                    try:
-                        token = Token.objects.get(key=token_key)
-                        return token.user
-                    except Token.DoesNotExist:
-                        return AnonymousUser()
-        return AnonymousUser()
+        token = self.scope['url_route']['kwargs'].get('token')
+        print(token)
+        try:
+            token = Token.objects.get(key=token)
+            return token.user
+        except Token.DoesNotExist:
+            return AnonymousUser()
+
+from urllib.parse import parse_qs
+from asgiref.sync import sync_to_async
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        query_string = self.scope['query_string'].decode()
+        query_params = parse_qs(query_string)
+        self.token = query_params.get('token', [None])[0]
         self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = 'chat_%s' % self.room_name
+        self.room_group_name = f"chat_{self.room_name}"
 
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        try:
+            token = await database_sync_to_async(Token.objects.get)(key=self.token)
+            self.user = await sync_to_async(lambda: token.user)()
 
-        await self.accept()
+            if self.user.is_authenticated:
+                # Join room group
+                await self.channel_layer.group_add(
+                    self.room_group_name,
+                    self.channel_name
+                )
+
+                await self.accept()
+            else:
+                await self.close() # Close the connection if not authenticated
+        except Token.DoesNotExist:
+            await self.close()
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -93,9 +110,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from room group
     async def chat_message(self, event):
-        message = event['message']
+        message = self.user.username + ': ' + event['message']
 
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'message': message
         }))
+
+    @database_sync_to_async
+    def get_user_from_token(self):
+        token = self.scope['url_route']['kwargs'].get('token')
+        print(token)
+        try:
+            token = Token.objects.get(key=token)
+            return token.user
+        except Token.DoesNotExist:
+            return AnonymousUser()

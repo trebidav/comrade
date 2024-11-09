@@ -3,31 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script>
-        const socket = new WebSocket('ws://localhost:8000/ws/location/');
-
-        socket.onopen = function() {
-            console.log('WebSocket connection established.');
-            socket.send(JSON.stringify({ message: 'Hello, server!' })); // Send a message
-        };
-
-        socket.onmessage = function(event) {
-            console.log('Message from server:', event.data); // Log messages from the server
-        };
-
-        socket.onclose = function() {
-            console.log('WebSocket connection closed.');
-        };
-
-        socket.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
-    </script>
-
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #messages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+        }
+        #messageInput {
+            width: 80%;
+        }
+    </style>
 </head>
 <body>
-    <ul id="list">
-    </ul>
+
+<h1>WebSocket Chat</h1>
+<p id="status">Connecting...</p>
+<div id="messages"></div>
+<input type="text" id="messageInput" placeholder="Type your message here..." />
+<button id="sendButton">Send</button>
+
+<script>
+
+{% comment %}
+TOTO BYL POKUS O ZÍSKÁNÍ TOKENU POMOCÍ FETCH A NÁSLEDNÉHO POUŽITÍ PŘI PŘIPOJENÍ K WEBSOCKETU
+
+    async function getToken() {
+        const params = new URLSearchParams(window.location.search);
+        console.log(params.toString())
+        const response = await fetch('http://localhost:8000/user/token/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: params.get('username'), password: params.get('password') })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch token');
+        }
+
+        const data = await response.json();
+        return data.token;
+    }
+
+    
+    token = getToken()
+    console.log(token) {% endcomment %}
+    const socket = new WebSocket("ws://localhost:8000/ws/chat/general/?token=90c6207f58de5573042be4c8ed1227a9a7f6f121");
+    const socket2 = new WebSocket("ws://localhost:8000/ws/location/?token=90c6207f58de5573042be4c8ed1227a9a7f6f121");
+
+
+    socket.onopen = function() {
+        document.getElementById('status').innerText = "WebSocket connection established.";
+        console.log("WebSocket connection established.");
+        startSendingLocation();  // Start sending location updates
+    };
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.innerHTML += `<p>${data.message}</p>`;  // Display the incoming message
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll to the bottom
+    };
+
+    socket.onclose = function() {
+        console.log("WebSocket connection closed.");
+    };
+
+    socket.onerror = function(error) {
+        console.error("WebSocket error:", error);
+    };
+
+    // Function to send a message
+    function sendMessage(message) {
+        const messageData = {
+            message: message
+        };
+        socket.send(JSON.stringify(messageData));
+    }
+
+    // Example usage: send a message when the button is clicked
+    document.getElementById('sendButton').onclick = function() {
+        const messageInput = document.getElementById('messageInput');
+        const message = messageInput.value.trim();
+        if (message) {
+            sendMessage(message);
+            messageInput.value = '';  // Clear the input field
+        }
+    };
+
+    // Optional: Send message on Enter key press
+    document.getElementById('messageInput').addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            document.getElementById('sendButton').click();  // Trigger the send button
+        }
+    });
+
+    // Function to send the user's location
+    function sendLocationUpdate(latitude, longitude) {
+        const locationData = {
+            latitude: latitude,
+            longitude: longitude
+        };
+        socket2.send(JSON.stringify(locationData));
+    }
+
+    // Function to start sending location updates
+    function startSendingLocation() {
+        if (navigator.geolocation) {
+            // Send location every 5 seconds
+            setInterval(() => {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        console.log(`Sending location: Latitude: ${latitude}, Longitude: ${longitude}`);
+                        sendLocationUpdate(latitude, longitude);
+                    },
+                    (error) => {
+                        console.error("Error getting location: ", error);
+                    },
+                    {
+                        enableHighAccuracy: true, // Use GPS for more accurate location
+                        maximumAge: 0, // Do not use cached location
+                        timeout: 5000 // Timeout after 5 seconds
+                    }
+                );
+            }, 5000); // Update every 5 seconds
+        } else {
+            console.log("Geolocation is not supported by this browser.");
+        }
+    }
+</script>
+
 </body>
 </html>
