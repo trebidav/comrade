@@ -29,6 +29,8 @@ djangorestframework = "*"
 django-filter = "*"
 django-async-stream = "*"
 adrf = "*"
+channels = "*"
+channels-redis = "*"
 
 [dev-packages]
 black = "==24.2.0"

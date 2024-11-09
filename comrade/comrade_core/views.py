@@ -21,9 +21,15 @@ from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.views import APIView
 
 
+
 def index(request):
     return render(request, "index.html")
 
+
+""" 
+# I tried to implement the following code,
+# but SSE is unsuitable due to lot of blocking connections
+# I will go with Websockets instead leveraging Django Channels
 
 def send(request):
     r = redis.Redis()
@@ -55,9 +61,6 @@ def start_task(request):
 
 
 async def sse_stream(request):
-    """
-    Sends server-sent events to the client.
-    """
     return StreamingHttpResponse(
         listen_to_channel(),
         content_type="text/event-stream",
@@ -112,3 +115,30 @@ class Notify(APIView):
         response["X-Accel-Buffering"] = "no"  # Disable buffering in nginx
         response["Cache-Control"] = "no-cache"  # Ensure clients don't cache the data
         return response
+ """
+
+from rest_framework import generics
+from .serializers import UserDetailSerializer
+
+class UserDetailView(generics.RetrieveAPIView):
+    serializer_class = UserDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user  # Return the currently authenticated user
+
+from django.contrib.auth import authenticate
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework import status
+from rest_framework.decorators import api_view
+
+@api_view(['POST'])
+def login_view(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    user = authenticate(username=username, password=password)
+    if user is not None:
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key}, status=status.HTTP_200_OK)
+    return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)

@@ -8,11 +8,16 @@ from django.contrib.auth.models import AbstractUser
 class User(AbstractUser):
     def __str__(self) -> str:
         return self.username 
+    
+    skills = models.ManyToManyField('Skill', blank=True)
+
+    def has_skill(self, skill_name):
+        return self.skills.filter(name=skill_name).exists()
 
 class Skill(models.Model):
-    title = models.CharField(max_length=32)
+    name = models.CharField(max_length=32)
     def __str__(self) -> str:
-        return self.title
+        return self.name
 
 class Task(models.Model):
     class Criticality(models.IntegerChoices):
@@ -29,10 +34,10 @@ class Task(models.Model):
         DONE = 5
     
     def __str__(self) -> str:
-        return self.title
+        return self.name
 
     # basic info
-    title = models.CharField(max_length=64, blank=True)
+    name = models.CharField(max_length=64, blank=False)
     description = models.CharField(max_length=200, blank=True)
 
     # permissions
@@ -68,11 +73,17 @@ class Task(models.Model):
         self.owner = user
         self.save()
 
-    def pause():
-        pass
+    def pause(self):
+        if self.state != 2:  # Check if the task is currently in progress
+            return False
+        self.state = 3  # Set state to WAITING
+        self.save()
 
-    def resume():
-        pass
+    def resume(self):
+        if self.state != 3:  # Check if the task is currently in WAITING state
+            return False
+        self.state = 2  # Set state back to IN_PROGRESS
+        self.save()
 
     def finish(self):
         self.datetime_finish = now()
