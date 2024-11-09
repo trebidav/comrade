@@ -1,5 +1,5 @@
-from comrade_core.models import Task
-from django.contrib.auth.models import Group, User
+from comrade_core.models import Task, User
+from django.contrib.auth.models import Group
 from rest_framework import serializers
 
 

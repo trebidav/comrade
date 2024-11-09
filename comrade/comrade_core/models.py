@@ -1,6 +1,13 @@
+import datetime
 from django.db import models
 from django.utils.timezone import now
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.auth.models import AbstractUser
+
+
+class User(AbstractUser):
+    def __str__(self) -> str:
+        return self.username 
 
 class Skill(models.Model):
     title = models.CharField(max_length=32)
@@ -35,11 +42,15 @@ class Task(models.Model):
 
     # task state
     state = models.IntegerField(choices=State, default=1, blank=True)
+    owner = models.ForeignKey('comrade_core.User', null=True, blank=True, on_delete=models.RESTRICT)
 
     # location
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
+
+    # respawn
     respawn = models.BooleanField(default=False)
+    respawn_time = models.TimeField(default=datetime.time(10, 0, 0))
 
     # values
     base_value = models.FloatField(blank=True, null=True)
@@ -51,10 +62,17 @@ class Task(models.Model):
     datetime_start = models.DateTimeField(auto_now_add=False, blank=True, null=True)
     datetime_finish  = models.DateTimeField(auto_now_add=False, blank=True, null=True)
 
-    def start(self):
+    def start(self, user):
         self.state = 2
         self.datetime_start = now()
+        self.owner = user
         self.save()
+
+    def pause():
+        pass
+
+    def resume():
+        pass
 
     def finish(self):
         self.datetime_finish = now()
@@ -63,7 +81,7 @@ class Task(models.Model):
     def rate(self):
         if self.state != 2:
             return False
-        r = Review()
+        r = Rating()
         r.task = self
         r.save()
         self.state=4
@@ -72,21 +90,23 @@ class Task(models.Model):
     def review(self):
         if self.state != 4:
             return False
-        r = Review()
+        r = Review(done=1)
         r.task = self
         r.save()
         self.state=5
         self.save()
 
 class Rating(models.Model):
-    task = models.ForeignKey(Task, default=None, on_delete=models.RESTRICT, blank=True)
-    happines = models.FloatField(default = 3)
-    time = models.IntegerField(default = 10)
+    task = models.ForeignKey('comrade_core.Task', default=None, on_delete=models.RESTRICT, blank=True)
+    happiness = models.FloatField(default = 1)
+    time = models.FloatField(default = 1)
+
+
     def __str__(self) -> str:
         return "Rating of task \""+ self.task + "\""
     
 class Review(models.Model):
-    task = models.ForeignKey(Task, default=None, on_delete=models.RESTRICT, blank=True)
+    task = models.ForeignKey('comrade_core.Task', default=None, on_delete=models.RESTRICT, blank=True)
     done = models.FloatField(validators=[MaxValueValidator(1.0), MinValueValidator(0.0)])
     def __str__(self) -> str:
         return "Review of task \""+ self.task + "\""
