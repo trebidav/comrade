@@ -43,7 +43,6 @@
             "name": "Drive to grocery store",
             "description": "Pick up groceries",
             "completed": false,
-            "site": 1,
             "required_skills": [1]
         }
     },

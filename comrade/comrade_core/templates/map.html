@@ -1,52 +1,78 @@
-{% comment %} <!DOCTYPE html>
-<html>
-  <head>
-    <title>Simple Marker</title>
-    <!-- The callback parameter is required, so we use console.debug as a noop -->
-    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB8-wufbAZGeg9larv0qRrAqRBMBrQc_nA&callback=console.debug&libraries=maps,marker&v=beta">
-
-    </script>
-    <style>
-      /* Always set the map height explicitly to define the size of the div
-       * element that contains the map. */
-      gmp-map {
-        height: 100%;
-      }
-
-      /* Optional: Makes the sample page fill the window. */
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <gmp-map center="40.12150192260742,-100.45039367675781" zoom="4" map-id="DEMO_MAP_ID">
-      <gmp-advanced-marker position="40.12150192260742,-100.45039367675781" title="My location"></gmp-advanced-marker>
-    </gmp-map>
-  </body>
-</html> {% endcomment %}
-
 <!DOCTYPE html>
 <html>
   <head>
     <title>Comrade Map</title>
     <!-- The callback parameter is required, so we use console.debug as a noop -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB8-wufbAZGeg9larv0qRrAqRBMBrQc_nA&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6UjXEjOGGxVwUFB2lHGNk2u0_NfJZSBg&callback=initMap" async defer></script>
 
     <script>
         let map;
         let userMarker;
+      
+        const socket = new WebSocket("ws://localhost:8000/ws/location/?token=a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a");
+        
+        socket.onopen = function() {
+            console.log("WebSocket connection established.");
+            startSendingLocation();  // Start sending location updates
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log("Received location update:", data); // why is this not working?
+            updateUserLocation(data.latitude, data.longitude);  // Update the user's location on the map
+        };
+
+        socket.onclose = function() {
+          console.log("WebSocket connection closed.");
+        };
     
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+        };
+        
+        function sendLocationUpdate(latitude, longitude) {
+            const locationData = {
+                latitude: latitude,
+                longitude: longitude
+            };
+            socket.send(JSON.stringify(locationData));
+        }
+    
+        // Function to start sending location updates
+        function startSendingLocation() {
+            if (navigator.geolocation) {
+                // Send location every 5 seconds
+                setInterval(() => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const latitude = position.coords.latitude;
+                            const longitude = position.coords.longitude;
+                            console.log(`Sending location: Latitude: ${latitude}, Longitude: ${longitude}`);
+                            sendLocationUpdate(latitude, longitude);
+                        },
+                        (error) => {
+                            console.error("Error getting location: ", error);
+                        },
+                        {
+                            enableHighAccuracy: true, // Use GPS for more accurate location
+                            maximumAge: 0, // Do not use cached location
+                            timeout: 5000 // Timeout after 5 seconds
+                        }
+                    );
+                }, 5000); // Update every 5 seconds
+            } else {
+                console.log("Geolocation is not supported by this browser.");
+            }
+
+        }
         function initMap() {
             // Initialize the map centered at a default location
             map = new google.maps.Map(document.getElementById('map'), {
                 center: { lat: 50, lng: 14 },  // Default center
                 zoom: 2  // Default zoom level
+                
             });
-    
+
             // Get the user's location
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -55,12 +81,10 @@
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
-    
-                        // Center the map on the user's location
+                          // Center the map on the user's location
                         map.setCenter(userLocation);
-                        map.setZoom(25);  // Zoom in closer
-    
-                        // Add a marker for the user's location
+                        map.setZoom(20);  // Zoom in closer
+                          // Add a marker for the user's location
                         userMarker = new google.maps.Marker({
                             position: userLocation,
                             map: map,
@@ -85,6 +109,30 @@
                 'Error: Your browser doesn\'t support geolocation.');
             infoWindow.open(map);
         }
+
+        // Function to update the user's location on the map
+        function updateUserLocation(latitude, longitude) {
+          const newLocation = {
+              lat: latitude,
+              lng: longitude
+          };
+
+          // Update the marker position
+          if (userMarker) {
+              userMarker.setPosition(newLocation);
+          } else {
+              // If the marker doesn't exist, create it
+              userMarker = new google.maps.Marker({
+                  position: newLocation,
+                  map: map,
+                  title: "You are here!"
+              });
+          }
+
+          // Optionally, center the map on the new location
+          map.setCenter(newLocation);
+      }
+
     </script>
     <style>
       /* Always set the map height explicitly to define the size of the div
