@@ -4,8 +4,16 @@ An OpenSource task manager for any community. Gamified.
 
 ## Contributing
 
+**Currently looking for contributors!** 
+- Django & Django-rest framework developers
+- JavaScript & React developers
+- Software Architects and Game Designers
+
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
+
+
+Feel free to comment on the Issues or contribute with ideas if you don't know where to start.
 
 ## Install
 
