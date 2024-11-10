@@ -47,7 +47,8 @@ class Task(models.Model):
 
     # task state
     state = models.IntegerField(choices=State, default=1, blank=True)
-    owner = models.ForeignKey('comrade_core.User', null=True, blank=True, on_delete=models.RESTRICT)
+    owner = models.ForeignKey('comrade_core.User', null=True, blank=True, on_delete=models.RESTRICT, related_name='owned_tasks')
+    assignee = models.ForeignKey('comrade_core.User', null=True, blank=True, on_delete=models.RESTRICT, related_name='assigned_tasks')
 
     # location
     lat = models.FloatField(null=True, blank=True)
