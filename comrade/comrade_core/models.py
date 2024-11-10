@@ -11,9 +11,14 @@ class User(AbstractUser):
     
     skills = models.ManyToManyField('Skill', blank=True)
 
+    latitude = models.FloatField(blank=True, default=0)
+    longitude = models.FloatField(blank=True, default=0)
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+
     def has_skill(self, skill_name):
         return self.skills.filter(name=skill_name).exists()
-
+ 
 class Skill(models.Model):
     name = models.CharField(max_length=32)
     def __str__(self) -> str:
