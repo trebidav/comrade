@@ -31,31 +31,6 @@
 
 <script>
 
-{% comment %}
-TOTO BYL POKUS O ZÍSKÁNÍ TOKENU POMOCÍ FETCH A NÁSLEDNÉHO POUŽITÍ PŘI PŘIPOJENÍ K WEBSOCKETU
-
-    async function getToken() {
-        const params = new URLSearchParams(window.location.search);
-        console.log(params.toString())
-        const response = await fetch('http://localhost:8000/user/token/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username: params.get('username'), password: params.get('password') })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to fetch token');
-        }
-
-        const data = await response.json();
-        return data.token;
-    }
-
-    
-    token = getToken()
-    console.log(token) {% endcomment %}
     const socket = new WebSocket("ws://localhost:8000/ws/chat/general/?token=90c6207f58de5573042be4c8ed1227a9a7f6f121");
     const socket2 = new WebSocket("ws://localhost:8000/ws/location/?token=90c6207f58de5573042be4c8ed1227a9a7f6f121");
 
