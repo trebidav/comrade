@@ -1,3 +1,13 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from .models import User, Task, Skill
 
-# Register your models here.
+class TaskAdmin(admin.ModelAdmin):
+    list_display = ['name', 'owner', 'state', 'lat', 'lon', 'respawn', 'respawn_time', 'base_value', 'criticality', 'contribution']
+    list_filter = ['state', 'respawn', 'criticality']
+    search_fields = ['name', 'description']
+
+
+admin.site.register(User, UserAdmin)
+admin.site.register(Task, TaskAdmin)
+admin.site.register(Skill)

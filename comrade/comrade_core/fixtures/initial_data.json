@@ -1,0 +1,72 @@
+[
+    {
+        "model": "comrade_core.user",
+        "pk": 1,
+        "fields": {
+            "username": "david",
+            "password": "pbkdf2_sha256$720000$eTJwwgmRGvb1hcdUjG202B$U3eyBzNllfQZavzu3cA/RGx6+tQ0Tl4EG9U2l9miJFc=",
+            "email": "david@example.com",
+            "first_name": "David",
+            "last_name": "Smith",
+            "is_active": true,
+            "is_staff": false,
+            "is_superuser": false,
+            "last_login": null,
+            "date_joined": "2023-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "comrade_core.skill",
+        "pk": 1,
+        "fields": {
+            "name": "Driving"
+        }
+    },
+    {
+        "model": "comrade_core.skill",
+        "pk": 2,
+        "fields": {
+            "name": "Cooking"
+        }
+    },
+    {
+        "model": "comrade_core.skill",
+        "pk": 3,
+        "fields": {
+            "name": "Cleaning"
+        }
+    },
+    {
+        "model": "comrade_core.task",
+        "pk": 1,
+        "fields": {
+            "name": "Drive to grocery store",
+            "description": "Pick up groceries",
+            "completed": false,
+            "site": 1,
+            "required_skills": [1]
+        }
+    },
+    {
+        "model": "comrade_core.task",
+        "pk": 2,
+        "fields": {
+            "name": "Prepare dinner",
+            "description": "Cook a meal for the community.",
+            "completed": false,
+            "site": 1,
+            "required_skills": [2]
+        }
+    },
+    {
+        "model": "comrade_core.task",
+        "pk": 3,
+        "fields": {
+            "name": "Clean the park",
+            "description": "Organize a community cleanup.",
+            "completed": false,
+            "site": 1,
+            "required_skills": [3]
+        }
+    }
+]
