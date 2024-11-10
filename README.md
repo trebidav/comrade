@@ -29,4 +29,4 @@ python manage.py runserver
 
 ## License
 
-[Comrade © 2024 by David Trebicky is licensed under CC BY-NC-SA 4.0 ](http://creativecommons.org/licenses/by-nc-sa/4.0/)
+Comrade © 2024 by David Trebicky is licensed under [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/)
