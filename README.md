@@ -8,16 +8,6 @@ The app is tailored for community workers, volunteers, and organizations that pr
 
 Using an interactive map, users can easily locate tasks that align with their skills and proximity. By encouraging skill development, the platform ensures tasks are matched with qualified individuals
 
-### Key features include:
-
-- Map based user interface
-- Interactions with location-based tasks
-- Real-time updates on task availability and locations of other users
-- Community chat and notifications for seamless communication and coordination
-- Opportunities to engage in local initiatives, volunteer activities, collaborative projects
-- Additionally, gamification elements introduce rewards, achievements, and game-like features to create a more engaging user experience while promoting healthy competition
-
-
 ### Possible ways to use:
 
 - **Disaster Response Coordination:** In the event of a natural disaster, community organizations can use the app to assign tasks such as delivering supplies, providing medical assistance, or coordinating evacuations based on the skills of volunteers.
@@ -25,6 +15,15 @@ Using an interactive map, users can easily locate tasks that align with their sk
 - **Environmental Initiatives:** Users can participate in environmental cleanup efforts, tree planting, or conservation projects, with tasks assigned based on skills like landscaping or environmental science.
 - **Event Planning and Management:** Organizers can create tasks for community events (e.g., festivals, fairs) and assign roles to volunteers based on their skills, ensuring that all aspects of the event are covered efficiently.
 - **P2P Work:** Users with specific skills can offer to solve problems and Comrade can facilitate task assignments, review and reward.
+
+### Key features include:
+
+- Map based user interface
+- Interactions with location-based tasks
+- Real-time updates on task availability and locations of other users
+- Community chat and notifications for seamless communication and coordination
+- Gamification elements introduce rewards, achievements, and game-like features to create a more engaging user experience while promoting healthy competition
+- Reward system
 
 # MVP – Looking for contributors!
 
@@ -35,7 +34,7 @@ First milestone is to reach MVP stage by implementing the minimal required funct
 - **User Authentication:** Secure login using Google OAuth, providing users with an API token for subsequent requests.
 - **Skill Management:** Users can have multiple skills, which determine their eligibility to pick up tasks.
 - **Real-Time Location Tracking:** Users can send their GPS location through WebSockets, allowing the app to reflect their current position on a map.
-- **Task Management:** Users can create, view, and manage tasks with specific skill requirements.
+- **Task Management:** Users can create, manage and execute tasks based on skill requirements.
 - **Interactive Map View:** Tasks are displayed on a map, making it easy for users to find and navigate to nearby tasks.
 
 
