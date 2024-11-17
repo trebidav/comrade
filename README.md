@@ -8,7 +8,7 @@ It is aimed at community workers, volunteers, and organizations that require eff
 
 Users can easily view available tasks on an interactive map, making it simple to find work that is relevant to their skills and location.
 By allowing users to gain specific skills, the app ensures that tasks are assigned to qualified individuals, improving the quality of work and efficiency.
-The app provides real-time updates on task and user locations as well as community chat, enabling better coordination and communication among team members.
+The app provides real-time updates on tasks availability and user locations as well as community chat and notifications, enabling better coordination and communication among team members.
 The platform fosters community involvement by allowing users to participate in local initiatives, volunteer opportunities, and collaborative projects.
 Gamification elements promotes healthy competition, introduces rewards and achievments to level up the User experience through game-like controls and mechanisms.
 
