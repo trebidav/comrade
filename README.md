@@ -20,7 +20,7 @@ Gamification elements promotes healthy competition, introduces rewards and achie
 - **Event Planning and Management:** Organizers can create tasks for community events (e.g., festivals, fairs) and assign roles to volunteers based on their skills, ensuring that all aspects of the event are covered efficiently.
 - **P2P Work:** Users with specific skills can offer to solve other people's problems and the app can facilitate task assignments and possibly reward.
 
-# MVP
+# MVP – Looking for contributors!
 
 First milestone is to reach MVP stage by implementing the minimal required functionality so the application can be demonstrated in a very simplified way.
 
@@ -39,7 +39,7 @@ Issues that should be addressed in the MVP are tracked in the milestone:
 
 https://github.com/trebidav/comrade/milestone/1
 
-# Contributing
+## Contributing
 
 **Currently looking for contributors!** 
 - Django & Django-rest framework developers
