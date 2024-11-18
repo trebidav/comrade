@@ -22,7 +22,7 @@ Using an interactive map, users can easily locate tasks that align with their sk
 - Interactions with location-based tasks
 - Real-time updates on task availability and locations of other users
 - Community chat and notifications for seamless communication and coordination
-- Gamification elements introduce rewards, achievements, and game-like features to create a more engaging user experience while promoting healthy competition
+- Gamification elements introduce rewards, achievements, and game-like features to create a more engaging user experience
 - Reward system
 
 # MVP – Looking for contributors!
