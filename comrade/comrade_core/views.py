@@ -5,6 +5,11 @@ import random
 from typing import AsyncGenerator, Callable
 
 import redis
+from allauth.socialaccount.adapter import (
+    get_adapter as get_socialaccount_adapter,
+)
+from allauth.socialaccount.models import SocialApp
+
 from comrade_core.models import Task
 from comrade_core.serializers import GroupSerializer, TaskSerializer, UserSerializer
 from django.conf import settings
@@ -24,6 +29,20 @@ from rest_framework.views import APIView
 
 def index(request):
     return render(request, "index.html")
+
+def google(request):
+    try:
+        provider = get_socialaccount_adapter().get_provider(
+            request, "google"
+        )
+        context = {
+            "client_id": provider.app.client_id,
+        }
+    except SocialApp.DoesNotExist:
+        context = {
+            "error": "Google social app not found. Check Sites in configuration.",
+        }
+    return render(request, "google.html", context=context)
 
 def map(request):
     return render(request, "map.html")
