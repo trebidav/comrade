@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "comrade_core",
     "allauth",
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "rest_framework",
