@@ -113,6 +113,8 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
+HEADLESS_TOKEN_STRATEGY = "comrade.token_strategy.ComradeTokenStrategy"
+
 CSRF_TRUSTED_ORIGINS = ["https://knowing-massive-macaw.ngrok-free.app"]
 
 LOGIN_URL = "/accounts/login/"
