@@ -108,23 +108,35 @@ class Task(models.Model):
         self.assignee = user
         self.save()
 
-    def pause(self):
+    def pause(self, user: User):
+        if user != self.owner or user != self.assignee:
+            raise ValidationError("Only owner and assignee can pause the task")
+
         if self.state != Task.State.IN_PROGRESS:
             return False
         self.state = Task.State.WAITING
         self.save()
 
-    def resume(self):
+    def resume(self, user: User):
+        if user != self.owner or user != self.assignee:
+            raise ValidationError("Only owner and assignee can resume the task")
+
         if self.state != Task.State.WAITING:
             return False
         self.state = Task.State.IN_PROGRESS
         self.save()
 
-    def finish(self):
+    def finish(self, user: User):
+        if user != self.owner or user != self.assignee:
+            raise ValidationError("Only owner and assignee can finish the task")
+
         self.datetime_finish = now()
         self.save()
 
-    def rate(self):
+    def rate(self, user: User):
+        if user != self.owner or user != self.assignee:
+            raise ValidationError("Only owner and assignee can rate the task")
+
         if self.state != Task.State.IN_PROGRESS:
             return False
         r = Rating()
@@ -133,7 +145,10 @@ class Task(models.Model):
         self.state = Task.State.IN_REVIEW
         self.save()
 
-    def review(self):
+    def review(self, user: User):
+        if user != self.owner:
+            raise ValidationError("Only owner can review the task")
+
         if self.state != Task.State.IN_REVIEW:
             return False
         r = Review(done=1)
