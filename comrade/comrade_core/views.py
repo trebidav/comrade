@@ -13,7 +13,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import UserDetailSerializer
+from .serializers import UserDetailSerializer, TaskSerializer
+
+from django.core.exceptions import ValidationError
 
 
 def index(request):
@@ -60,20 +62,55 @@ def login_view(request):
 
 
 # POST /task/{taskId}/start
-class MyPostView(APIView):
+class TaskStartView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request):
-        taskId = request.query_params["taskId"]
+    def post(self, request: Request, taskId: int):
         task = None
         try:
             task = Task.objects.get(pk=taskId)
         except Task.DoesNotExist as e:
-            raise e
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        task.start(request.user)
+        try:
+            task.start(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
         return Response(
             {"message": "Task started!"},
+            status=status.HTTP_200_OK,
+        )
+
+class TaskFinishView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, taskId: int):
+        task = None
+        try:
+            task = Task.objects.get(pk=taskId)
+        except Task.DoesNotExist as e:
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        print(request.user)
+        try:
+            task.finish(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+
+        return Response(
+            {"message": "Task finished!"},
+            status=status.HTTP_200_OK,
+        )
+
+class TaskListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        tasks = Task.objects.filter(skill_read__in=user.skills.all())
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(
+            {"tasks": serializer.data},
             status=status.HTTP_200_OK,
         )

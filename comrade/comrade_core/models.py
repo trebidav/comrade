@@ -99,6 +99,8 @@ class Task(models.Model):
     def start(self, user: User):
         if user == self.owner:
             raise ValidationError("Owner cannot start the task")
+        if self.state != Task.State.OPEN:
+            raise ValidationError("Task is not open")
 
         has_required_skills = user.skills.filter(
             id__in=self.skill_execute.all()
