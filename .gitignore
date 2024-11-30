@@ -161,3 +161,7 @@ cython_debug/
 
 # macOs
 **/.DS_Store
+
+
+# Redis
+**/dump.rdb
