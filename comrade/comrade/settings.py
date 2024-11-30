@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "comrade_core",
     "allauth",
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "rest_framework",
@@ -111,6 +112,8 @@ AUTHENTICATION_BACKENDS = [
     # `allauth` specific authentication methods, such as login by email
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
+
+HEADLESS_TOKEN_STRATEGY = "comrade.token_strategy.ComradeTokenStrategy"
 
 CSRF_TRUSTED_ORIGINS = ["https://knowing-massive-macaw.ngrok-free.app"]
 
