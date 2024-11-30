@@ -97,9 +97,13 @@ class Task(models.Model):
     datetime_finish = models.DateTimeField(auto_now_add=False, blank=True, null=True)
 
     def start(self, user: User):
+        if user == self.owner:
+            raise ValidationError("Owner cannot start the task")
+
         has_required_skills = user.skills.filter(
             id__in=self.skill_execute.all()
         ).exists()
+
         if not has_required_skills:
             raise ValidationError("User does not have required skills")
 
@@ -109,48 +113,49 @@ class Task(models.Model):
         self.save()
 
     def pause(self, user: User):
-        if user != self.owner or user != self.assignee:
-            raise ValidationError("Only owner and assignee can pause the task")
+        if user != self.assignee:
+            raise ValidationError("Only assignee can pause the task")
 
         if self.state != Task.State.IN_PROGRESS:
             return False
+        
         self.state = Task.State.WAITING
         self.save()
 
     def resume(self, user: User):
-        if user != self.owner or user != self.assignee:
-            raise ValidationError("Only owner and assignee can resume the task")
-
         if self.state != Task.State.WAITING:
             return False
+        
+        if user != self.assignee:
+            raise ValidationError("Only assignee can resume the task")
+        
         self.state = Task.State.IN_PROGRESS
         self.save()
 
     def finish(self, user: User):
+        if self.state != Task.State.IN_PROGRESS:
+            return False
+
         if user != self.owner or user != self.assignee:
             raise ValidationError("Only owner and assignee can finish the task")
 
         self.datetime_finish = now()
-        self.save()
-
-    def rate(self, user: User):
-        if user != self.owner or user != self.assignee:
-            raise ValidationError("Only owner and assignee can rate the task")
-
-        if self.state != Task.State.IN_PROGRESS:
-            return False
-        r = Rating()
-        r.task = self
-        r.save()
         self.state = Task.State.IN_REVIEW
         self.save()
 
     def review(self, user: User):
-        if user != self.owner:
-            raise ValidationError("Only owner can review the task")
-
         if self.state != Task.State.IN_REVIEW:
             return False
+
+        if user == self.owner:
+            raise ValidationError("Owner cannot review the task")
+
+        has_required_skills = user.skills.filter(
+            id__in=self.skill_write.all()
+        ).exists()
+        if not has_required_skills:
+            raise ValidationError("User does not have required skills")
+
         r = Review(done=1)
         r.task = self
         r.save()
