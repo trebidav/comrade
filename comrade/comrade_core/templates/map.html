@@ -8,9 +8,11 @@
     <script>
         let map;
         let userMarker;
+        let infoWindow;
       
         const socket = new WebSocket("ws://localhost:8000/ws/location/?token=a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a");
         
+
         socket.onopen = function() {
             console.log("WebSocket connection established.");
             startSendingLocation();  // Start sending location updates
@@ -65,13 +67,18 @@
             }
 
         }
-        function initMap() {
-            // Initialize the map centered at a default location
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 50, lng: 14 },  // Default center
-                zoom: 2  // Default zoom level
-                
-            });
+
+        async function initMap() {
+            const { Map } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+            map = new Map(document.getElementById("map"), {
+                center: { lat: 50, lng: 14 },
+                zoom: 8,
+                mapId: "DEMO_MAP_ID",
+              });
+
+            infoWindow = new google.maps.InfoWindow();
 
             // Get the user's location
             if (navigator.geolocation) {
@@ -85,10 +92,32 @@
                         map.setCenter(userLocation);
                         map.setZoom(20);  // Zoom in closer
                           // Add a marker for the user's location
-                        userMarker = new google.maps.Marker({
+                        const userMarker = new google.maps.marker.AdvancedMarkerElement({
                             position: userLocation,
                             map: map,
-                            title: "You are here!"
+                            gmpClickable: true
+                        });
+
+                        // Fetch user details and update the tooltip
+                        fetch('/user/', {
+                            headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            const username = data.username;
+                            const skills = data.skills.join(', ');
+                            userMarker.title = `Username: ${username}\nSkills: ${skills}`;
+                        })
+                        .catch(error => {
+                            console.error("Error fetching user details:", error);
+                        });
+
+                        userMarker.addListener("click", ({ domEvent, latLng }) => {
+                            const { target } = domEvent;
+                        
+                            infoWindow.close();
+                            infoWindow.setContent(userMarker.title);
+                            infoWindow.open(userMarker.map, userMarker);
                         });
                     },
                     () => {
@@ -99,6 +128,8 @@
                 // Browser doesn't support Geolocation
                 handleLocationError(false, map.getCenter());
             }
+
+            displayTasks();  // Display tasks on the map
         }
     
         function handleLocationError(browserHasGeolocation, pos) {
@@ -119,19 +150,89 @@
 
           // Update the marker position
           if (userMarker) {
-              userMarker.setPosition(newLocation);
+            userMarker.position = newLocation;
           } else {
-              // If the marker doesn't exist, create it
-              userMarker = new google.maps.Marker({
-                  position: newLocation,
-                  map: map,
-                  title: "You are here!"
-              });
+            // If the marker doesn't exist, create it
+            userMarker = new google.maps.marker.AdvancedMarkerElement({
+                position: newLocation,
+                map: map,
+                gmpClickable: true
+            });
+            
+            fetch('/user/', {
+                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const username = data.username;
+                const skills = data.skills.join(', ');
+                userMarker.title = `Username: ${username}\nSkills: ${skills}`;
+            })
+            .catch(error => {
+                console.error("Error fetching user details:", error);
+            });
+
+            userMarker.addListener("click", ({ domEvent, latLng }) => {
+                const { target } = domEvent;
+            
+                infoWindow.close();
+                infoWindow.setContent(userMarker.title);
+                infoWindow.open(userMarker.map, userMarker);
+            });
+
+              
+            
           }
 
           // Optionally, center the map on the new location
           map.setCenter(newLocation);
-      }
+        }
+
+        function displayTasks() {
+            // Get the tasks from the server
+            fetch('/tasks/', {
+                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Tasks:", data);
+                    // Check if data is an array
+                    if (Array.isArray(data.tasks)) {
+                        // Display the tasks on the map
+                        data.tasks.forEach(task => {
+                            const taskLocation = {
+                                lat: task.lat,
+                                lng: task.lon
+                            };
+                            const taskMarker = new google.maps.marker.AdvancedMarkerElement({
+                                position: taskLocation,
+                                map: map,
+                                title: task.name,
+                                gmpClickable: true
+                            });
+                            
+                            // Add a click listener for each marker, and set up the info window.
+                            taskMarker.addListener("click", ({ domEvent, latLng }) => {
+                                const { target } = domEvent;
+                                
+                                fetch("http://localhost:8000/task/"+task.id+"/start", {
+                                    method: 'POST',
+                                    headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
+                                    });
+                                infoWindow.close();
+                                infoWindow.setContent("<a id='button' href=http://localhost:8000/task/"+task.id+"/start target='_blank'>"+task.name+"</a>");
+                                infoWindow.open(taskMarker.map, taskMarker);
+                            });
+                        });
+                    } else {
+                        console.error("Error: Expected an array of tasks");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching tasks:", error);
+                });
+        }
+
 
     </script>
     <style>

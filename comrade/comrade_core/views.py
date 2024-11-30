@@ -13,7 +13,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import UserDetailSerializer
+from .serializers import UserDetailSerializer, TaskSerializer
+
+from django.core.exceptions import ValidationError
 
 
 def index(request):
@@ -63,17 +65,32 @@ def login_view(request):
 class MyPostView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request):
-        taskId = request.query_params["taskId"]
+    def post(self, request: Request, taskId: int):
         task = None
         try:
             task = Task.objects.get(pk=taskId)
         except Task.DoesNotExist as e:
-            raise e
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        task.start(request.user)
+        try:
+            task.start(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(
             {"message": "Task started!"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class TaskListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        tasks = Task.objects.filter(skill_read__in=user.skills.all())
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(
+            {"tasks": serializer.data},
             status=status.HTTP_200_OK,
         )
