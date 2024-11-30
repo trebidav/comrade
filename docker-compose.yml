@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - 6379:6379
+  postgres:
+    environment:
+      POSTGRES_USER: comrade
+      POSTGRES_PASSWORD: comrade
+      POSTGRES_DB: comrade
+    image: postgres:alpine
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+volumes:
+  postgres-data:
