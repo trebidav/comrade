@@ -88,10 +88,12 @@
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
-                          // Center the map on the user's location
+
+                        // Center the map on the user's location
                         map.setCenter(userLocation);
                         map.setZoom(20);  // Zoom in closer
-                          // Add a marker for the user's location
+
+                        // Add a marker for the user's location
                         const userMarker = new google.maps.marker.AdvancedMarkerElement({
                             position: userLocation,
                             map: map,
@@ -158,7 +160,7 @@
                 map: map,
                 gmpClickable: true
             });
-            
+
             fetch('/user/', {
                 headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
             })

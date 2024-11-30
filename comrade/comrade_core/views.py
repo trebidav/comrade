@@ -62,7 +62,7 @@ def login_view(request):
 
 
 # POST /task/{taskId}/start
-class MyPostView(APIView):
+class TaskStartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
@@ -75,13 +75,33 @@ class MyPostView(APIView):
         try:
             task.start(request.user)
         except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
         return Response(
             {"message": "Task started!"},
             status=status.HTTP_200_OK,
         )
 
+class TaskFinishView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, taskId: int):
+        task = None
+        try:
+            task = Task.objects.get(pk=taskId)
+        except Task.DoesNotExist as e:
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        print(request.user)
+        try:
+            task.finish(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+
+        return Response(
+            {"message": "Task finished!"},
+            status=status.HTTP_200_OK,
+        )
 
 class TaskListView(APIView):
     permission_classes = [IsAuthenticated]
