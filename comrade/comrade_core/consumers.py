@@ -55,6 +55,12 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 await self.save_user_location(self.user, latitude, longitude)
                 return
 
+            # Get user's friends and skills for friend updates
+            friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+            skills = await database_sync_to_async(
+                lambda: list(self.user.skills.values_list('name', flat=True))
+            )()
+
             # Prepare the location update message
             location_update = {
                 'type': 'friend_location' if self.user.location_sharing_level == User.SharingLevel.FRIENDS else 'public_location',
@@ -63,16 +69,13 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 'latitude': latitude,
                 'longitude': longitude,
                 'accuracy': accuracy,
-                'timestamp': timezone.now().isoformat()
+                'timestamp': timezone.now().isoformat(),
+                'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
+                'skills': skills
             }
 
             # Handle different sharing levels
             if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
-                # Get list of friends to share with
-                friends = await database_sync_to_async(
-                    lambda: list(self.user.get_friends())
-                )()
-                
                 # Send to each friend's location group
                 for friend in friends:
                     friend_location_group = f"location_{friend.id}"
@@ -123,7 +126,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'latitude': event['latitude'],
             'longitude': event['longitude'],
             'accuracy': event['accuracy'],
-            'timestamp': event['timestamp']
+            'timestamp': event['timestamp'],
+            'friends': event['friends'],
+            'skills': event['skills']
         }))
 
     async def public_location(self, event):

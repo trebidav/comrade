@@ -283,7 +283,10 @@
         }
 
         function updateFriendLocation(data) {
-            const { userId, latitude, longitude, name } = data;
+            const { userId, latitude, longitude, name, friends, skills } = data;
+            
+            // Check if this user is in our friends list
+            const isFriend = userInfo.friends.some(friend => friend.id === userId);
             
             // Create or update marker
             if (!friendsMarkers[userId]) {
@@ -301,13 +304,35 @@
                     }
                 });
 
-                // Add info window
+                // Add info window with friend-specific content
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `<div><strong>${name}</strong></div>`
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${name}</h3>
+                            ${isFriend ? `
+                                <div style="margin-bottom: 8px;">
+                                    <strong style="color: #666;">Friends (${friends?.length || 0}):</strong>
+                                    <p style="margin: 4px 0; color: #666;">
+                                        ${friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <strong style="color: #666;">Skills:</strong>
+                                    <p style="margin: 4px 0; color: #666;">${skills?.join(', ') || 'No skills listed'}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `
                 });
 
-                marker.addListener('click', () => {
+                // Show info window on mouseover
+                marker.addListener('mouseover', () => {
                     infoWindow.open(map, marker);
+                });
+
+                // Hide info window on mouseout
+                marker.addListener('mouseout', () => {
+                    infoWindow.close();
                 });
 
                 friendsMarkers[userId] = marker;
