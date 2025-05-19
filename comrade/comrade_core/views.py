@@ -53,11 +53,16 @@ def map(request):
     # Create or get token
     token, created = Token.objects.get_or_create(user=request.user)
     
+    # Get friends list
+    friends = request.user.get_friends()
+    
     # Prepare user data
     user_data = {
         'id': request.user.id,
         'email': request.user.email,
-        'name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+        'name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+        'friends': [{'id': friend.id, 'name': f"{friend.first_name} {friend.last_name}".strip() or friend.username} for friend in friends],
+        'skills': list(request.user.skills.values_list('name', flat=True))
     }
     
     context = {

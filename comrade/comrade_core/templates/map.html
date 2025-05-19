@@ -227,6 +227,35 @@
                         strokeWeight: 2,
                     }
                 });
+
+                // Add info window for user's location
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
+                                <p style="margin: 4px 0; color: #666;">
+                                    ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                </p>
+                            </div>
+                            <div>
+                                <strong style="color: #666;">Skills:</strong>
+                                <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                // Show info window on mouseover
+                userMarker.addListener('mouseover', () => {
+                    infoWindow.open(map, userMarker);
+                });
+
+                // Hide info window on mouseout
+                userMarker.addListener('mouseout', () => {
+                    infoWindow.close();
+                });
             } else {
                 userMarker.setPosition({ lat, lng });
             }

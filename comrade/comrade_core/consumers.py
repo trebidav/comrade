@@ -43,56 +43,58 @@ class LocationConsumer(AsyncWebsocketConsumer):
             await self.update_preferences(data['preferences'])
             return
 
-        latitude = data['latitude']
-        longitude = data['longitude']
+        # Handle location updates
+        if data.get('type') == 'location_update':
+            latitude = data['latitude']
+            longitude = data['longitude']
+            accuracy = data.get('accuracy', 50)  # Default accuracy if not provided
 
-        # Check sharing preferences before broadcasting
-        if self.user.location_sharing_level == User.SharingLevel.NONE:
-            # Only save location, don't broadcast
-            await self.save_user_location(self.user, latitude, longitude)
-            return
+            # Check sharing preferences before broadcasting
+            if self.user.location_sharing_level == User.SharingLevel.NONE:
+                # Only save location, don't broadcast
+                await self.save_user_location(self.user, latitude, longitude)
+                return
 
-        # Prepare the location update message
-        location_update = {
-            'type': 'location_update',
-            'user_id': self.user.id,
-            'username': self.user.username,
-            'latitude': latitude,
-            'longitude': longitude,
-            'timestamp': timezone.now().isoformat()
-        }
+            # Prepare the location update message
+            location_update = {
+                'type': 'friend_location' if self.user.location_sharing_level == User.SharingLevel.FRIENDS else 'public_location',
+                'userId': self.user.id,
+                'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+                'latitude': latitude,
+                'longitude': longitude,
+                'accuracy': accuracy,
+                'timestamp': timezone.now().isoformat()
+            }
 
-        # Handle different sharing levels
-        if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
-            # Get list of friends to share with
-            friends = await database_sync_to_async(
-                lambda: list(self.user.get_friends())
-            )()
+            # Handle different sharing levels
+            if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
+                # Get list of friends to share with
+                friends = await database_sync_to_async(
+                    lambda: list(self.user.get_friends())
+                )()
+                
+                # Send to each friend's location group
+                for friend in friends:
+                    friend_location_group = f"location_{friend.id}"
+                    await self.channel_layer.group_send(
+                        friend_location_group,
+                        location_update
+                    )
+            else:  # ALL
+                # Get nearby users who share their location
+                nearby_users = await database_sync_to_async(
+                    self.user.get_nearby_users
+                )()
+                
+                # Send to each nearby user's location group
+                for user in nearby_users:
+                    user_location_group = f"location_{user.id}"
+                    await self.channel_layer.group_send(
+                        user_location_group,
+                        location_update
+                    )
             
-            # Send to each friend's location group
-            for friend in friends:
-                friend_location_group = f"location_{friend.id}"
-                await self.channel_layer.group_send(
-                    friend_location_group,
-                    location_update
-                )
-        else:  # ALL
-            # Get nearby users who share their location
-            nearby_users = await database_sync_to_async(
-                self.user.get_nearby_users
-            )()
-            
-            # Send to each nearby user's location group
-            for user in nearby_users:
-                user_location_group = f"location_{user.id}"
-                await self.channel_layer.group_send(
-                    user_location_group,
-                    location_update
-                )
-        
-        # Save location regardless of sharing preferences
-        timestamp = self.user.timestamp
-        if timestamp is None or timezone.now() - timestamp > timedelta(seconds=30):
+            # Save location regardless of sharing preferences
             await self.save_user_location(self.user, latitude, longitude)
             print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude}")
 
@@ -112,11 +114,36 @@ class LocationConsumer(AsyncWebsocketConsumer):
             }
         }))
 
+    async def friend_location(self, event):
+        """Handler for friend location updates"""
+        await self.send(text_data=json.dumps({
+            'type': 'friend_location',
+            'userId': event['userId'],
+            'name': event['name'],
+            'latitude': event['latitude'],
+            'longitude': event['longitude'],
+            'accuracy': event['accuracy'],
+            'timestamp': event['timestamp']
+        }))
+
+    async def public_location(self, event):
+        """Handler for public location updates"""
+        await self.send(text_data=json.dumps({
+            'type': 'public_location',
+            'userId': event['userId'],
+            'name': event['name'],
+            'latitude': event['latitude'],
+            'longitude': event['longitude'],
+            'accuracy': event['accuracy'],
+            'timestamp': event['timestamp']
+        }))
+
     async def location_update(self, event):
         # Send location update with user identification
         await self.send(text_data=json.dumps({
-            'user_id': event['user_id'],
-            'username': event['username'],
+            'type': event['type'],
+            'userId': event['userId'],
+            'name': event['name'],
             'latitude': event['latitude'],
             'longitude': event['longitude'],
             'timestamp': event['timestamp']
