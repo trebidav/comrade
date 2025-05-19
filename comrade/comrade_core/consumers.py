@@ -5,10 +5,10 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
+from .models import User
 
 class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.group_name = 'location_updates'
         query_string = self.scope['query_string'].decode()
         query_params = parse_qs(query_string)
         self.token = query_params.get('token', [None])[0]
@@ -16,55 +16,113 @@ class LocationConsumer(AsyncWebsocketConsumer):
             token = await database_sync_to_async(Token.objects.get)(key=self.token)
             self.user = await sync_to_async(lambda: token.user)()
             if self.user.is_authenticated:
-#                self.group_name = f"user_{self.user.id}"
+                # Create a unique group for this user's location updates
+                self.location_group = f"location_{self.user.id}"
                 await self.channel_layer.group_add(
-                    self.group_name,
+                    self.location_group,
                     self.channel_name
                 )
-                await self.accept()  # Accept the WebSocket connection
+                await self.accept()
             else:
-                await self.close()  # Close the connection if not authenticated
+                await self.close()
         except Token.DoesNotExist:
             await self.close()
 
     async def disconnect(self, close_code):
-        if self.group_name:
+        if hasattr(self, 'location_group'):
             await self.channel_layer.group_discard(
-                self.group_name,
+                self.location_group,
                 self.channel_name
             )
 
     async def receive(self, text_data):
         data = json.loads(text_data)
+        
+        # Handle preference updates
+        if 'preferences' in data:
+            await self.update_preferences(data['preferences'])
+            return
+
         latitude = data['latitude']
         longitude = data['longitude']
 
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                'type': 'location_update',
-                'latitude': latitude,
-                'longitude': longitude
-            }
-        )
-        
-        timestamp = self.user.timestamp
+        # Check sharing preferences before broadcasting
+        if self.user.location_sharing_level == User.SharingLevel.NONE:
+            # Only save location, don't broadcast
+            await self.save_user_location(self.user, latitude, longitude)
+            return
 
-        # Check if enough time has passed since the last save
+        # Prepare the location update message
+        location_update = {
+            'type': 'location_update',
+            'user_id': self.user.id,
+            'username': self.user.username,
+            'latitude': latitude,
+            'longitude': longitude,
+            'timestamp': timezone.now().isoformat()
+        }
+
+        # Handle different sharing levels
+        if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
+            # Get list of friends to share with
+            friends = await database_sync_to_async(
+                lambda: list(self.user.get_friends())
+            )()
+            
+            # Send to each friend's location group
+            for friend in friends:
+                friend_location_group = f"location_{friend.id}"
+                await self.channel_layer.group_send(
+                    friend_location_group,
+                    location_update
+                )
+        else:  # ALL
+            # Get nearby users who share their location
+            nearby_users = await database_sync_to_async(
+                self.user.get_nearby_users
+            )()
+            
+            # Send to each nearby user's location group
+            for user in nearby_users:
+                user_location_group = f"location_{user.id}"
+                await self.channel_layer.group_send(
+                    user_location_group,
+                    location_update
+                )
+        
+        # Save location regardless of sharing preferences
+        timestamp = self.user.timestamp
         if timestamp is None or timezone.now() - timestamp > timedelta(seconds=30):
-            # Save the user's location to the database
             await self.save_user_location(self.user, latitude, longitude)
             print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude}")
 
+    async def update_preferences(self, preferences_data):
+        """Update user's location sharing preferences"""
+        sharing_level = preferences_data.get('sharing_level')
+        if sharing_level in dict(User.SharingLevel.choices):
+            self.user.location_sharing_level = sharing_level
+            await database_sync_to_async(self.user.save)()
+        
+        # Send confirmation back to user
+        await self.send(text_data=json.dumps({
+            'type': 'preferences_updated',
+            'status': 'success',
+            'preferences': {
+                'sharing_level': self.user.location_sharing_level
+            }
+        }))
 
     async def location_update(self, event):
+        # Send location update with user identification
         await self.send(text_data=json.dumps({
+            'user_id': event['user_id'],
+            'username': event['username'],
             'latitude': event['latitude'],
-            'longitude': event['longitude']
+            'longitude': event['longitude'],
+            'timestamp': event['timestamp']
         }))
 
     async def save_user_location(self, user, latitude, longitude):
-        # Create a new UserLocation instance and save it to the database
         user.latitude = latitude
         user.longitude = longitude
         user.timestamp = timezone.now()
