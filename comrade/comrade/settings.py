@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
+import socket
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,9 +27,14 @@ SECRET_KEY = "django-insecure-t(rozl)sf7o$37&8iyu+)^50w5%h&3=u_-19@%mnmi*2f1@m8&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["knowing-massive-macaw.ngrok-free.app", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '934c-77-240-102-76.ngrok-free.app',
+]
 
 SITE_ID = 1
+SITE_URL = 'https://934c-77-240-102-76.ngrok-free.app'
 
 # Application definition
 
@@ -82,7 +88,31 @@ CHANNEL_LAYERS = {
     },
 }
 
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://accounts.google.com"
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 ROOT_URLCONF = "comrade.urls"
 
@@ -115,10 +145,28 @@ AUTHENTICATION_BACKENDS = [
 
 HEADLESS_TOKEN_STRATEGY = "comrade.token_strategy.ComradeTokenStrategy"
 
-CSRF_TRUSTED_ORIGINS = ["https://knowing-massive-macaw.ngrok-free.app"]
+# Get local IP address for OAuth
+def get_local_ip():
+    try:
+        # Create a socket to get the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except:
+        return "127.0.0.1"
+
+LOCAL_IP = get_local_ip()
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://934c-77-240-102-76.ngrok-free.app',
+]
 
 LOGIN_URL = "/accounts/login/"
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http"
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 
 WSGI_APPLICATION = "comrade.wsgi.application"
@@ -178,3 +226,44 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "comrade_core.User"
+
+# Social Account Settings
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': '838713168413-ntjqd2o22eihod384btlheuc07g5glai.apps.googleusercontent.com',
+            'secret': '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',
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+        'OAUTH_PKCE_ENABLED': True,
+    }
+}
+
+# AllAuth Settings
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_QUERY_EMAIL = True
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
+ACCOUNT_LOGOUT_ON_GET = True
+
+# Login/Logout URLs
+LOGIN_REDIRECT_URL = '/map/'
+LOGOUT_REDIRECT_URL = '/login/'
+
+# CSRF Settings
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = True
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_DOMAIN = None

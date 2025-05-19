@@ -4,7 +4,7 @@ from allauth.socialaccount.adapter import (
 from comrade_core.models import Task
 from allauth.socialaccount.models import SocialApp, SocialAccount
 from django.contrib.auth import authenticate
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from rest_framework import generics, status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -12,32 +12,60 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView, OAuth2CallbackView
+from django.contrib.auth import get_user_model
+from allauth.socialaccount.providers.google.provider import GoogleProvider
 
 from .serializers import UserDetailSerializer, TaskSerializer
 
 from django.core.exceptions import ValidationError
 from .models import User
 
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.utils.decorators import method_decorator
+import json
+
+User = get_user_model()
+
 
 def index(request):
     return render(request, "index.html")
 
 
+@ensure_csrf_cookie
+def login_page(request):
+    """Render the login page with Google sign-in"""
+    return render(request, "login.html")
+
+
 def google(request):
-    try:
-        provider = get_socialaccount_adapter().get_provider(request, "google")
-        context = {
-            "client_id": provider.app.client_id,
-        }
-    except SocialApp.DoesNotExist:
-        context = {
-            "error": "Google social app not found. Check Sites in configuration.",
-        }
-    return render(request, "google.html", context=context)
+    return render(request, "google.html")
 
 
 def map(request):
-    return render(request, "map.html")
+    """Render the map page"""
+    if not request.user.is_authenticated:
+        return redirect('login_page')
+    
+    # Create or get token
+    token, created = Token.objects.get_or_create(user=request.user)
+    
+    # Prepare user data
+    user_data = {
+        'id': request.user.id,
+        'email': request.user.email,
+        'name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    }
+    
+    context = {
+        'api_token': token.key,
+        'user': json.dumps(user_data)
+    }
+    
+    return render(request, "map.html", context=context)
 
 
 class UserDetailView(generics.RetrieveAPIView):
@@ -45,21 +73,122 @@ class UserDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        return self.request.user  # Return the currently authenticated user
+        return self.request.user
 
 
-@api_view(["POST"])
+@api_view(["GET"])
 def login_view(request):
-    username = request.data.get("username")
-    password = request.data.get("password")
-    user = authenticate(username=username, password=password)
-    if user is not None:
-        token, created = Token.objects.get_or_create(user=user)
-        return Response({"token": token.key}, status=status.HTTP_200_OK)
+    """Redirect to login page"""
+    return redirect('login_page')
 
-    return Response(
-        {"error": "Invalid Credentials"}, status=status.HTTP_401_UNAUTHORIZED
-    )
+
+@csrf_exempt
+@api_view(["GET", "POST"])
+def google_login_view(request):
+    """Handle Google OAuth login"""
+    if request.method == "GET":
+        # Handle the redirect from Google
+        credential = request.GET.get('credential')
+        if not credential:
+            return redirect('login_page')
+        
+        try:
+            # Get user info from Google
+            adapter = GoogleOAuth2Adapter(request)
+            client = OAuth2Client(request, adapter.client_id, adapter.client_secret, adapter.access_token_method, adapter.access_token_url, adapter.callback_url, adapter.scope)
+            user_info = client.get_user_info(credential)
+
+            # Get or create user
+            try:
+                user = User.objects.get(email=user_info['email'])
+            except User.DoesNotExist:
+                # Create new user
+                user = User.objects.create_user(
+                    username=user_info['email'],
+                    email=user_info['email'],
+                    first_name=user_info.get('given_name', ''),
+                    last_name=user_info.get('family_name', '')
+                )
+
+            # Create or get social account
+            social_account, created = SocialAccount.objects.get_or_create(
+                provider=GoogleProvider.id,
+                uid=user_info['id'],
+                defaults={'user': user}
+            )
+            if not created:
+                social_account.user = user
+                social_account.save()
+
+            # Create or get token
+            token, created = Token.objects.get_or_create(user=user)
+            
+            # Store token and user info in session
+            request.session['api_token'] = token.key
+            request.session['user'] = {
+                'id': user.id,
+                'email': user.email,
+                'name': f"{user.first_name} {user.last_name}".strip() or user.username
+            }
+            
+            return redirect('map')
+            
+        except Exception as e:
+            return redirect('login_page')
+    
+    # Handle POST requests (if any)
+    access_token = request.data.get("access_token")
+    if not access_token:
+        return Response(
+            {"error": "Access token is required"}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Get user info from Google
+        adapter = GoogleOAuth2Adapter(request)
+        client = OAuth2Client(request, adapter.client_id, adapter.client_secret, adapter.access_token_method, adapter.access_token_url, adapter.callback_url, adapter.scope)
+        user_info = client.get_user_info(access_token)
+
+        # Get or create user
+        try:
+            user = User.objects.get(email=user_info['email'])
+        except User.DoesNotExist:
+            # Create new user
+            user = User.objects.create_user(
+                username=user_info['email'],
+                email=user_info['email'],
+                first_name=user_info.get('given_name', ''),
+                last_name=user_info.get('family_name', '')
+            )
+
+        # Create or get social account
+        social_account, created = SocialAccount.objects.get_or_create(
+            provider=GoogleProvider.id,
+            uid=user_info['id'],
+            defaults={'user': user}
+        )
+        if not created:
+            social_account.user = user
+            social_account.save()
+
+        # Create or get token
+        token, created = Token.objects.get_or_create(user=user)
+        
+        return Response({
+            "token": token.key,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": f"{user.first_name} {user.last_name}".strip() or user.username
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
 
 # POST /task/{taskId}/start
@@ -114,35 +243,6 @@ class TaskListView(APIView):
         return Response(
             {"tasks": serializer.data},
             status=status.HTTP_200_OK,
-        )
-
-@api_view(["POST"])
-def google_login_view(request):
-    access_token = request.data.get("access_token")
-    
-    if not access_token:
-        return Response(
-            {"error": "Access token is required"}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        # Get the social account associated with the Google token
-        social_account = SocialAccount.objects.get(
-            provider="google",
-            extra_data__id_token=access_token
-        )
-        user = social_account.user
-        
-        # Create or get the API token for the user
-        token, created = Token.objects.get_or_create(user=user)
-        
-        return Response({"token": token.key}, status=status.HTTP_200_OK)
-        
-    except SocialAccount.DoesNotExist:
-        return Response(
-            {"error": "Invalid Google token"}, 
-            status=status.HTTP_401_UNAUTHORIZED
         )
 
 @api_view(['POST'])
@@ -213,3 +313,24 @@ def get_sent_requests(request):
     sent_requests = request.user.get_sent_friend_requests()
     serializer = UserDetailSerializer(sent_requests, many=True)
     return Response({'sent_requests': serializer.data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def get_user_info(request):
+    """Get user information after successful login"""
+    if not request.user.is_authenticated:
+        return Response(
+            {"error": "User not authenticated"}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Create or get token
+    token, created = Token.objects.get_or_create(user=request.user)
+    
+    return Response({
+        "token": token.key,
+        "user": {
+            "id": request.user.id,
+            "email": request.user.email,
+            "name": f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+        }
+    }, status=status.HTTP_200_OK)

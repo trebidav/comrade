@@ -1,260 +1,330 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Comrade Map</title>
-    <!-- The callback parameter is required, so we use console.debug as a noop -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6UjXEjOGGxVwUFB2lHGNk2u0_NfJZSBg&callback=initMap" async defer></script>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map - Comrade</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6UjXEjOGGxVwUFB2lHGNk2u0_NfJZSBg"></script>
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .user-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .user-info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .user-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .logout-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .logout-button:hover {
+            background: #c82333;
+        }
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .legend-text {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="user-info">
+        <h3>Logged in as:</h3>
+        <p id="user-name">Loading...</p>
+        <p id="user-email">Loading...</p>
+        <button class="logout-button" onclick="window.location.href='/accounts/logout/'">Logout</button>
+    </div>
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4285F4;"></div>
+            <span class="legend-text">Your Location</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #34A853;"></div>
+            <span class="legend-text">Friends</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FBBC05;"></div>
+            <span class="legend-text">Public Shares</span>
+        </div>
+    </div>
 
     <script>
+        // Get API token and user info from context
+        const apiToken = '{{ api_token }}';
+        const userInfo = JSON.parse('{{ user|safe }}');
+
+        // Store in localStorage for future use
+        localStorage.setItem('api_token', apiToken);
+        localStorage.setItem('user_info', JSON.stringify(userInfo));
+
+        // Display user info
+        document.getElementById('user-name').textContent = userInfo.name;
+        document.getElementById('user-email').textContent = userInfo.email;
+
+        // Initialize map
         let map;
         let userMarker;
-        let infoWindow;
-      
-        const socket = new WebSocket("ws://localhost:8000/ws/location/?token=a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a");
-        
+        let accuracyCircle;
+        let friendsMarkers = {};
+        let publicMarkers = {};
 
-        socket.onopen = function() {
-            console.log("WebSocket connection established.");
-            startSendingLocation();  // Start sending location updates
-        };
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 50.0755, lng: 14.4378 }, // Prague
+                zoom: 13,
+            });
 
-        socket.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            console.log("Received location update:", data); // why is this not working?
-            updateUserLocation(data.latitude, data.longitude);  // Update the user's location on the map
-        };
+            // Initialize WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/location/?token=${apiToken}`);
 
-        socket.onclose = function() {
-          console.log("WebSocket connection closed.");
-        };
-    
-        socket.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
-        
-        function sendLocationUpdate(latitude, longitude) {
-            const locationData = {
-                latitude: latitude,
-                longitude: longitude
-            };
-            socket.send(JSON.stringify(locationData));
-        }
-    
-        // Function to start sending location updates
-        function startSendingLocation() {
-            if (navigator.geolocation) {
-                // Send location every 5 seconds
-                setInterval(() => {
+            ws.onopen = function() {
+                console.log('WebSocket connection established');
+                // Start sending location updates
+                if (navigator.geolocation) {
+                    // First, get initial position
                     navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const latitude = position.coords.latitude;
-                            const longitude = position.coords.longitude;
-                            console.log(`Sending location: Latitude: ${latitude}, Longitude: ${longitude}`);
-                            sendLocationUpdate(latitude, longitude);
+                        function(position) {
+                            updateUserLocation({
+                                coords: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude,
+                                    accuracy: position.coords.accuracy
+                                }
+                            });
                         },
-                        (error) => {
-                            console.error("Error getting location: ", error);
+                        function(error) {
+                            console.error('Error getting initial location:', error);
                         },
                         {
-                            enableHighAccuracy: true, // Use GPS for more accurate location
-                            maximumAge: 0, // Do not use cached location
-                            timeout: 5000 // Timeout after 5 seconds
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
                         }
                     );
-                }, 5000); // Update every 5 seconds
-            } else {
-                console.log("Geolocation is not supported by this browser.");
-            }
 
-        }
-
-        async function initMap() {
-            const { Map } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-            map = new Map(document.getElementById("map"), {
-                center: { lat: 50, lng: 14 },
-                zoom: 8,
-                mapId: "DEMO_MAP_ID",
-              });
-
-            infoWindow = new google.maps.InfoWindow();
-
-            // Get the user's location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const userLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-
-                        // Center the map on the user's location
-                        map.setCenter(userLocation);
-                        map.setZoom(20);  // Zoom in closer
-
-                        // Add a marker for the user's location
-                        const userMarker = new google.maps.marker.AdvancedMarkerElement({
-                            position: userLocation,
-                            map: map,
-                            gmpClickable: true
-                        });
-
-                        // Fetch user details and update the tooltip
-                        fetch('/user/', {
-                            headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            const username = data.username;
-                            const skills = data.skills.join(', ');
-                            userMarker.title = `Username: ${username}\nSkills: ${skills}`;
-                        })
-                        .catch(error => {
-                            console.error("Error fetching user details:", error);
-                        });
-
-                        userMarker.addListener("click", ({ domEvent, latLng }) => {
-                            const { target } = domEvent;
-                        
-                            infoWindow.close();
-                            infoWindow.setContent(userMarker.title);
-                            infoWindow.open(userMarker.map, userMarker);
-                        });
-                    },
-                    () => {
-                        handleLocationError(true, map.getCenter());
-                    }
-                );
-            } else {
-                // Browser doesn't support Geolocation
-                handleLocationError(false, map.getCenter());
-            }
-
-            displayTasks();  // Display tasks on the map
-        }
-    
-        function handleLocationError(browserHasGeolocation, pos) {
-            const infoWindow = new google.maps.InfoWindow();
-            infoWindow.setPosition(pos);
-            infoWindow.setContent(browserHasGeolocation ?
-                'Error: The Geolocation service failed.' :
-                'Error: Your browser doesn\'t support geolocation.');
-            infoWindow.open(map);
-        }
-
-        // Function to update the user's location on the map
-        function updateUserLocation(latitude, longitude) {
-          const newLocation = {
-              lat: latitude,
-              lng: longitude
-          };
-
-          // Update the marker position
-          if (userMarker) {
-            userMarker.position = newLocation;
-          } else {
-            // If the marker doesn't exist, create it
-            userMarker = new google.maps.marker.AdvancedMarkerElement({
-                position: newLocation,
-                map: map,
-                gmpClickable: true
-            });
-
-            fetch('/user/', {
-                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const username = data.username;
-                const skills = data.skills.join(', ');
-                userMarker.title = `Username: ${username}\nSkills: ${skills}`;
-            })
-            .catch(error => {
-                console.error("Error fetching user details:", error);
-            });
-
-            userMarker.addListener("click", ({ domEvent, latLng }) => {
-                const { target } = domEvent;
-            
-                infoWindow.close();
-                infoWindow.setContent(userMarker.title);
-                infoWindow.open(userMarker.map, userMarker);
-            });
-
-              
-            
-          }
-
-          // Optionally, center the map on the new location
-          map.setCenter(newLocation);
-        }
-
-        function displayTasks() {
-            // Get the tasks from the server
-            fetch('/tasks/', {
-                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Tasks:", data);
-                    // Check if data is an array
-                    if (Array.isArray(data.tasks)) {
-                        // Display the tasks on the map
-                        data.tasks.forEach(task => {
-                            const taskLocation = {
-                                lat: task.lat,
-                                lng: task.lon
-                            };
-                            const taskMarker = new google.maps.marker.AdvancedMarkerElement({
-                                position: taskLocation,
-                                map: map,
-                                title: task.name,
-                                gmpClickable: true
+                    // Then, watch for position changes
+                    navigator.geolocation.watchPosition(
+                        function(position) {
+                            updateUserLocation({
+                                coords: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude,
+                                    accuracy: position.coords.accuracy
+                                }
                             });
                             
-                            // Add a click listener for each marker, and set up the info window.
-                            taskMarker.addListener("click", ({ domEvent, latLng }) => {
-                                const { target } = domEvent;
-                                
-                                fetch("http://localhost:8000/task/"+task.id+"/start", {
-                                    method: 'POST',
-                                    headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-                                    });
-                                infoWindow.close();
-                                infoWindow.setContent("<a id='button' href=http://localhost:8000/task/"+task.id+"/start target='_blank'>"+task.name+"</a>");
-                                infoWindow.open(taskMarker.map, taskMarker);
-                            });
-                        });
-                    } else {
-                        console.error("Error: Expected an array of tasks");
-                    }
-                })
-                .catch(error => {
-                    console.error("Error fetching tasks:", error);
-                });
+                            // Send location to server
+                            const location = {
+                                type: 'location_update',
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                userId: userInfo.id,
+                                name: userInfo.name
+                            };
+                            
+                            if (ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify(location));
+                            }
+                        },
+                        function(error) {
+                            console.error('Error watching location:', error);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'location_update') {
+                    updateUserLocation({
+                        coords: {
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            accuracy: data.accuracy || 50
+                        }
+                    });
+                } else if (data.type === 'friend_location') {
+                    updateFriendLocation(data);
+                } else if (data.type === 'public_location') {
+                    updatePublicLocation(data);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
         }
 
+        function updateUserLocation(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
 
+            // Update or create marker
+            if (!userMarker) {
+                userMarker = new google.maps.Marker({
+                    position: { lat, lng },
+                    map: map,
+                    title: 'Your Location',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+            } else {
+                userMarker.setPosition({ lat, lng });
+            }
+
+            // Update or create accuracy circle
+            if (!accuracyCircle) {
+                accuracyCircle = new google.maps.Circle({
+                    strokeColor: '#4285F4',
+                    strokeOpacity: 0.2,
+                    strokeWeight: 1,
+                    fillColor: '#4285F4',
+                    fillOpacity: 0.1,
+                    map: map,
+                    center: { lat, lng },
+                    radius: accuracy
+                });
+            } else {
+                accuracyCircle.setCenter({ lat, lng });
+                accuracyCircle.setRadius(accuracy);
+            }
+
+            // Center map on user's location
+            map.setCenter({ lat, lng });
+            map.setZoom(15); // Zoom level for street view
+        }
+
+        function updateFriendLocation(data) {
+            const { userId, latitude, longitude, name } = data;
+            
+            // Create or update marker
+            if (!friendsMarkers[userId]) {
+                const marker = new google.maps.Marker({
+                    position: { lat: latitude, lng: longitude },
+                    map: map,
+                    title: name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#34A853',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+
+                // Add info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div><strong>${name}</strong></div>`
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                friendsMarkers[userId] = marker;
+            } else {
+                const marker = friendsMarkers[userId];
+                marker.setPosition({ lat: latitude, lng: longitude });
+            }
+        }
+
+        function updatePublicLocation(data) {
+            const { userId, latitude, longitude, name } = data;
+            
+            // Create or update marker
+            if (!publicMarkers[userId]) {
+                const marker = new google.maps.Marker({
+                    position: { lat: latitude, lng: longitude },
+                    map: map,
+                    title: name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#FBBC05',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+
+                // Add info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div><strong>${name}</strong></div>`
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                publicMarkers[userId] = marker;
+            } else {
+                const marker = publicMarkers[userId];
+                marker.setPosition({ lat: latitude, lng: longitude });
+            }
+        }
+
+        // Initial WebSocket connection
+        initMap();
     </script>
-    <style>
-      /* Always set the map height explicitly to define the size of the div
-       * element that contains the map. */
-      #map {
-        height: 100%;
-      }
-
-      /* Optional: Makes the sample page fill the window. */
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>User Location Map</h1>
-    <div id="map"></div>
-  </body>
+</body>
 </html>
