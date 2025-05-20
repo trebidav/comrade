@@ -55,7 +55,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 await self.save_user_location(self.user, latitude, longitude)
                 return
 
-            # Get user's friends and skills for friend updates
+            # Get user's friends and skills for updates
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
             skills = await database_sync_to_async(
                 lambda: list(self.user.skills.values_list('name', flat=True))
@@ -74,7 +74,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 'skills': skills
             }
 
-            # Handle different sharing levels
             if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
                 # Send to each friend's location group
                 for friend in friends:
@@ -84,13 +83,13 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         location_update
                     )
             else:  # ALL
-                # Get nearby users who share their location
-                nearby_users = await database_sync_to_async(
-                    self.user.get_nearby_users
+                # Get all active users except self
+                active_users = await database_sync_to_async(
+                    lambda: list(User.objects.exclude(id=self.user.id))
                 )()
                 
-                # Send to each nearby user's location group
-                for user in nearby_users:
+                # Send to all active users
+                for user in active_users:
                     user_location_group = f"location_{user.id}"
                     await self.channel_layer.group_send(
                         user_location_group,
@@ -140,7 +139,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'latitude': event['latitude'],
             'longitude': event['longitude'],
             'accuracy': event['accuracy'],
-            'timestamp': event['timestamp']
+            'timestamp': event['timestamp'],
+            'friends': event['friends'],
+            'skills': event['skills']
         }))
 
     async def location_update(self, event):

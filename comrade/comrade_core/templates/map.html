@@ -64,6 +64,103 @@
         .legend-text {
             color: #666;
         }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .friend-request {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .friend-request-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .accept-button {
+            background: #34A853;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reject-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .accept-button:hover {
+            background: #2d8f47;
+        }
+        .reject-button:hover {
+            background: #c82333;
+        }
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .friend-requests-button {
+            position: relative;
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .friend-requests-button:hover {
+            background: #357abd;
+        }
     </style>
 </head>
 <body>
@@ -72,7 +169,11 @@
         <h3>Logged in as:</h3>
         <p id="user-name">Loading...</p>
         <p id="user-email">Loading...</p>
-        <button class="logout-button" onclick="window.location.href='/accounts/logout/'">Logout</button>
+        <button class="friend-requests-button" onclick="openFriendRequestsModal()">
+            Friend Requests
+            <span id="friend-requests-badge" class="notification-badge" style="display: none;">0</span>
+        </button>
+        <button class="logout-button" onclick="window.location.href='{% url 'account_logout' %}?next=/login/'">Logout</button>
     </div>
     <div class="legend">
         <div class="legend-item">
@@ -86,6 +187,18 @@
         <div class="legend-item">
             <div class="legend-color" style="background: #FBBC05;"></div>
             <span class="legend-text">Public Shares</span>
+        </div>
+    </div>
+
+    <!-- Friend Requests Modal -->
+    <div id="friendRequestsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Friend Requests</h2>
+            </div>
+            <div id="friendRequestsList">
+                <!-- Friend requests will be inserted here -->
+            </div>
         </div>
     </div>
 
@@ -108,6 +221,121 @@
         let accuracyCircle;
         let friendsMarkers = {};
         let publicMarkers = {};
+
+        // Friend requests modal functions
+        function openFriendRequestsModal() {
+            document.getElementById('friendRequestsModal').style.display = 'block';
+            fetchPendingRequests();
+        }
+
+        function closeFriendRequestsModal() {
+            document.getElementById('friendRequestsModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('friendRequestsModal');
+            if (event.target === modal) {
+                closeFriendRequestsModal();
+            }
+        }
+
+        async function fetchPendingRequests() {
+            try {
+                const response = await fetch('/friends/pending/', {
+                    headers: {
+                        'Authorization': `Token ${apiToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayPendingRequests(data.pending_requests);
+                    updateRequestsBadge(data.pending_requests.length);
+                } else {
+                    console.error('Failed to fetch pending requests');
+                }
+            } catch (error) {
+                console.error('Error fetching pending requests:', error);
+            }
+        }
+
+        function updateRequestsBadge(count) {
+            const badge = document.getElementById('friend-requests-badge');
+            if (count > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = count;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function displayPendingRequests(requests) {
+            const container = document.getElementById('friendRequestsList');
+            container.innerHTML = '';
+
+            if (requests.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666;">No pending friend requests</p>';
+                return;
+            }
+
+            requests.forEach(request => {
+                const requestElement = document.createElement('div');
+                requestElement.className = 'friend-request';
+                requestElement.innerHTML = `
+                    <span>${request.first_name} ${request.last_name}</span>
+                    <div class="friend-request-buttons">
+                        <button class="accept-button" onclick="handleFriendRequest(${request.id}, 'accept')">Accept</button>
+                        <button class="reject-button" onclick="handleFriendRequest(${request.id}, 'reject')">Reject</button>
+                    </div>
+                `;
+                container.appendChild(requestElement);
+            });
+        }
+
+        async function handleFriendRequest(userId, action) {
+            const csrfToken = getCookie('csrftoken');
+            if (!csrfToken) {
+                alert('CSRF token not found. Please refresh the page.');
+                return;
+            }
+
+            try {
+                const endpoint = action === 'accept' ? 'accept' : 'reject';
+                const response = await fetch(`/friends/${endpoint}/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token ${apiToken}`
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // Refresh the pending requests list
+                    fetchPendingRequests();
+                    
+                    // If accepted, refresh the page to update friends list
+                    if (action === 'accept') {
+                        window.location.reload();
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || `Failed to ${action} friend request`);
+                }
+            } catch (error) {
+                console.error(`Error ${action}ing friend request:`, error);
+                alert(`Failed to ${action} friend request. Please try again.`);
+            }
+        }
+
+        // Check for pending requests periodically
+        setInterval(fetchPendingRequests, 30000); // Check every 30 seconds
+        // Initial check for pending requests
+        fetchPendingRequests();
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -208,9 +436,9 @@
         }
 
         function updateUserLocation(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
+            const lat = position.coords ? position.coords.latitude : position.latitude;
+            const lng = position.coords ? position.coords.longitude : position.longitude;
+            const accuracy = position.coords ? position.coords.accuracy : (position.accuracy || 50);
 
             // Update or create marker
             if (!userMarker) {
@@ -247,14 +475,31 @@
                     `
                 });
 
-                // Show info window on mouseover
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
                 userMarker.addListener('mouseover', () => {
-                    infoWindow.open(map, userMarker);
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, userMarker);
+                    }
                 });
 
-                // Hide info window on mouseout
+                // Hide info window on mouseout (only if not locked)
                 userMarker.addListener('mouseout', () => {
-                    infoWindow.close();
+                    if (!isInfoWindowLocked) {
+                        infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
+                userMarker.addListener('click', () => {
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, userMarker);
+                    }
                 });
             } else {
                 userMarker.setPosition({ lat, lng });
@@ -325,14 +570,31 @@
                     `
                 });
 
-                // Show info window on mouseover
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
                 marker.addListener('mouseover', () => {
-                    infoWindow.open(map, marker);
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, marker);
+                    }
                 });
 
-                // Hide info window on mouseout
+                // Hide info window on mouseout (only if not locked)
                 marker.addListener('mouseout', () => {
-                    infoWindow.close();
+                    if (!isInfoWindowLocked) {
+                        infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
+                marker.addListener('click', () => {
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, marker);
+                    }
                 });
 
                 friendsMarkers[userId] = marker;
@@ -344,6 +606,10 @@
 
         function updatePublicLocation(data) {
             const { userId, latitude, longitude, name } = data;
+            
+            // Don't show add friend button if it's our own marker or already a friend
+            const isOwnMarker = userId === userInfo.id;
+            const isAlreadyFriend = userInfo.friends.some(friend => friend.id === userId);
             
             // Create or update marker
             if (!publicMarkers[userId]) {
@@ -363,11 +629,100 @@
 
                 // Add info window
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `<div><strong>${name}</strong></div>`
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${name}</h3>
+                            ${!isOwnMarker && !isAlreadyFriend ? `
+                                <button 
+                                    id="add-friend-${userId}"
+                                    style="
+                                        background: #34A853;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 15px;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        margin-top: 5px;
+                                    "
+                                >
+                                    Add to Friends
+                                </button>
+                            ` : ''}
+                        </div>
+                    `
                 });
 
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
+                marker.addListener('mouseover', () => {
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                // Hide info window on mouseout (only if not locked)
+                marker.addListener('mouseout', () => {
+                    if (!isInfoWindowLocked) {
+                        infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
                 marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, marker);
+                        // Add click handler when locking the window
+                        if (!isOwnMarker && !isAlreadyFriend) {
+                            setTimeout(() => {
+                                const addFriendButton = document.getElementById(`add-friend-${userId}`);
+                                if (addFriendButton) {
+                                    addFriendButton.onclick = async () => {
+                                        try {
+                                            const csrfToken = getCookie('csrftoken');
+                                            if (!csrfToken) {
+                                                alert('CSRF token not found. Please refresh the page.');
+                                                return;
+                                            }
+
+                                            const response = await fetch(`/friends/send/${userId}/`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRFToken': csrfToken,
+                                                    'Authorization': `Token ${apiToken}`
+                                                },
+                                                credentials: 'include'  // Changed from same-origin to include
+                                            });
+                                            
+                                            if (response.ok) {
+                                                addFriendButton.style.backgroundColor = '#666';
+                                                addFriendButton.textContent = 'Friend Request Sent';
+                                                addFriendButton.disabled = true;
+                                            } else {
+                                                // Check if response is JSON
+                                                const contentType = response.headers.get('content-type');
+                                                if (contentType && contentType.includes('application/json')) {
+                                                    const data = await response.json();
+                                                    alert(data.error || 'Failed to send friend request');
+                                                } else {
+                                                    // Handle non-JSON response (like HTML)
+                                                    alert('Failed to send friend request. Please make sure you are logged in.');
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Error sending friend request:', error);
+                                            alert('Failed to send friend request. Please try again.');
+                                        }
+                                    };
+                                }
+                            }, 0);
+                        }
+                    }
                 });
 
                 publicMarkers[userId] = marker;
@@ -375,6 +730,22 @@
                 const marker = publicMarkers[userId];
                 marker.setPosition({ lat: latitude, lng: longitude });
             }
+        }
+
+        // Helper function to get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
         }
 
         // Initial WebSocket connection

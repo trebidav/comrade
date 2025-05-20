@@ -21,8 +21,9 @@ from comrade_core import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('accounts/', include('allauth.urls')),
-    path('login/', views.login_page, name='login_page'),
+    path('', include('comrade_core.urls')),  # Include all comrade_core URLs
+    path('accounts/', include('allauth.urls')),  # allauth URLs for social auth
+    path('login/', views.login_page, name='login_page'),  # Keep our custom login page
     path('map/', views.map, name='map'),
     path('api/user/info/', views.get_user_info, name='get_user_info'),
 ]

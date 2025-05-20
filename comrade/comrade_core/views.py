@@ -18,6 +18,7 @@ from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView, OAuth2CallbackView
 from django.contrib.auth import get_user_model
 from allauth.socialaccount.providers.google.provider import GoogleProvider
+from allauth.account.decorators import login_required
 
 from .serializers import UserDetailSerializer, TaskSerializer
 
@@ -38,6 +39,8 @@ def index(request):
 @ensure_csrf_cookie
 def login_page(request):
     """Render the login page with Google sign-in"""
+    if request.user.is_authenticated:
+        return redirect('map')
     return render(request, "login.html")
 
 
@@ -45,11 +48,10 @@ def google(request):
     return render(request, "google.html")
 
 
+@ensure_csrf_cookie
+@login_required
 def map(request):
     """Render the map page"""
-    if not request.user.is_authenticated:
-        return redirect('login_page')
-    
     # Create or get token
     token, created = Token.objects.get_or_create(user=request.user)
     
@@ -64,6 +66,10 @@ def map(request):
         'friends': [{'id': friend.id, 'name': f"{friend.first_name} {friend.last_name}".strip() or friend.username} for friend in friends],
         'skills': list(request.user.skills.values_list('name', flat=True))
     }
+    
+    # Set CSRF cookie
+    from django.middleware.csrf import get_token
+    get_token(request)
     
     context = {
         'api_token': token.key,
@@ -136,9 +142,14 @@ def google_login_view(request):
                 'name': f"{user.first_name} {user.last_name}".strip() or user.username
             }
             
+            # Set CSRF cookie
+            from django.middleware.csrf import get_token
+            get_token(request)
+            
             return redirect('map')
             
         except Exception as e:
+            print("Google login error:", str(e))
             return redirect('login_page')
     
     # Handle POST requests (if any)

@@ -75,6 +75,7 @@ MIDDLEWARE = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
 }
@@ -92,7 +93,8 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://accounts.google.com"
+    "https://accounts.google.com",
+    "https://934c-77-240-102-76.ngrok-free.app"
 ]
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -165,7 +167,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://934c-77-240-102-76.ngrok-free.app',
 ]
 
-LOGIN_URL = "/accounts/login/"
+LOGIN_URL = '/login/'
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 
@@ -241,8 +243,8 @@ SOCIALACCOUNT_PROVIDERS = {
         ],
         'AUTH_PARAMS': {
             'access_type': 'online',
-        },
-        'OAUTH_PKCE_ENABLED': True,
+            'prompt': 'select_account'
+        }
     }
 }
 
@@ -264,6 +266,6 @@ LOGOUT_REDIRECT_URL = '/login/'
 # CSRF Settings
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
-CSRF_USE_SESSIONS = True
+CSRF_USE_SESSIONS = False
 CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_DOMAIN = None
