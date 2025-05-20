@@ -1,5 +1,7 @@
 # Comrade: OpenSource task manager for any community. Gamified.
 
+![Preview](preview.png)
+
 ### Main idea
 
 Comrade App is a community-driven task management platform designed to empower users by organizing and coordinating execution of location-based tasks. With real-time updates and skill-based task assignments, it enhances collaboration, streamlines task management, and fosters active community involvement.
