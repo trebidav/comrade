@@ -423,6 +423,62 @@
                     updateFriendLocation(data);
                 } else if (data.type === 'public_location') {
                     updatePublicLocation(data);
+                } else if (data.type === 'friend_details') {
+                    // Update local user info if it's about us
+                    if (data.userId === userInfo.id) {
+                        userInfo.friends = data.friends;
+                        userInfo.skills = data.skills;
+                        localStorage.setItem('user_info', JSON.stringify(userInfo));
+                        
+                        // Update the user's info window content
+                        if (userMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            userMarker.addListener('click', () => {
+                                infoWindow.open(map, userMarker);
+                            });
+                        }
+                    } else {
+                        // Update friend marker info if it exists
+                        const friendMarker = friendsMarkers[data.userId];
+                        if (friendMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${data.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${data.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${data.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${data.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            friendMarker.addListener('click', () => {
+                                infoWindow.open(map, friendMarker);
+                            });
+                        }
+                    }
                 }
             };
 

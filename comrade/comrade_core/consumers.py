@@ -49,52 +49,60 @@ class LocationConsumer(AsyncWebsocketConsumer):
             longitude = data['longitude']
             accuracy = data.get('accuracy', 50)  # Default accuracy if not provided
 
-            # Check sharing preferences before broadcasting
-            if self.user.location_sharing_level == User.SharingLevel.NONE:
-                # Only save location, don't broadcast
-                await self.save_user_location(self.user, latitude, longitude)
-                return
-
             # Get user's friends and skills for updates
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
             skills = await database_sync_to_async(
                 lambda: list(self.user.skills.values_list('name', flat=True))
             )()
 
-            # Prepare the location update message
-            location_update = {
-                'type': 'friend_location' if self.user.location_sharing_level == User.SharingLevel.FRIENDS else 'public_location',
-                'userId': self.user.id,
-                'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
-                'latitude': latitude,
-                'longitude': longitude,
-                'accuracy': accuracy,
-                'timestamp': timezone.now().isoformat(),
-                'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
-                'skills': skills
-            }
+            # Only proceed with sharing if not set to NONE
+            if self.user.location_sharing_level != User.SharingLevel.NONE:
+                # First, always send detailed updates to friends
+                friend_update = {
+                    'type': 'friend_location',
+                    'userId': self.user.id,
+                    'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    'accuracy': accuracy,
+                    'timestamp': timezone.now().isoformat(),
+                    'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
+                    'skills': skills
+                }
 
-            if self.user.location_sharing_level == User.SharingLevel.FRIENDS:
-                # Send to each friend's location group
+                # Send detailed update to all friends
                 for friend in friends:
                     friend_location_group = f"location_{friend.id}"
                     await self.channel_layer.group_send(
                         friend_location_group,
-                        location_update
+                        friend_update
                     )
-            else:  # ALL
-                # Get all active users except self
-                active_users = await database_sync_to_async(
-                    lambda: list(User.objects.exclude(id=self.user.id))
-                )()
-                
-                # Send to all active users
-                for user in active_users:
-                    user_location_group = f"location_{user.id}"
-                    await self.channel_layer.group_send(
-                        user_location_group,
-                        location_update
-                    )
+
+                # If sharing level is ALL, also send basic info to non-friends
+                if self.user.location_sharing_level == User.SharingLevel.ALL:
+                    # For public users, send location without detailed info
+                    public_update = {
+                        'type': 'public_location',
+                        'userId': self.user.id,
+                        'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'accuracy': accuracy,
+                        'timestamp': timezone.now().isoformat()
+                    }
+
+                    # Get all non-friend users
+                    active_users = await database_sync_to_async(
+                        lambda: list(User.objects.exclude(id=self.user.id).exclude(id__in=[f.id for f in friends]))
+                    )()
+                    
+                    # Send to all non-friend users
+                    for user in active_users:
+                        user_location_group = f"location_{user.id}"
+                        await self.channel_layer.group_send(
+                            user_location_group,
+                            public_update
+                        )
             
             # Save location regardless of sharing preferences
             await self.save_user_location(self.user, latitude, longitude)
@@ -139,7 +147,15 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'latitude': event['latitude'],
             'longitude': event['longitude'],
             'accuracy': event['accuracy'],
-            'timestamp': event['timestamp'],
+            'timestamp': event['timestamp']
+        }))
+
+    async def friend_details(self, event):
+        """Handler for friend details updates"""
+        await self.send(text_data=json.dumps({
+            'type': 'friend_details',
+            'userId': event['userId'],
+            'name': event['name'],
             'friends': event['friends'],
             'skills': event['skills']
         }))

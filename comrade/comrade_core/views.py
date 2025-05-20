@@ -28,6 +28,8 @@ from .models import User
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 import json
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 User = get_user_model()
 
@@ -279,6 +281,41 @@ def accept_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.accept_friend_request(target_user)
+
+        # Get channel layer for WebSocket communication
+        channel_layer = get_channel_layer()
+
+        # Get both users' friends and skills
+        current_user_friends = request.user.get_friends()
+        target_user_friends = target_user.get_friends()
+
+        # Prepare friend details messages for both users
+        current_user_details = {
+            'type': 'friend_details',
+            'userId': request.user.id,
+            'name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+            'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in current_user_friends],
+            'skills': list(request.user.skills.values_list('name', flat=True))
+        }
+
+        target_user_details = {
+            'type': 'friend_details',
+            'userId': target_user.id,
+            'name': f"{target_user.first_name} {target_user.last_name}".strip() or target_user.username,
+            'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in target_user_friends],
+            'skills': list(target_user.skills.values_list('name', flat=True))
+        }
+
+        # Send friend details to both users
+        async_to_sync(channel_layer.group_send)(
+            f"location_{target_user.id}",
+            current_user_details
+        )
+        async_to_sync(channel_layer.group_send)(
+            f"location_{request.user.id}",
+            target_user_details
+        )
+
         return Response({'status': 'Friend request accepted'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
