@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Comrade</title>
+    {% load socialaccount %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .login-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-bottom: 15px;
+        }
+        .logo {
+            margin-bottom: 30px;
+        }
+        .logo h1 {
+            color: #333;
+            margin: 0;
+            font-size: 2em;
+        }
+        .logo p {
+            color: #666;
+            margin: 10px 0 0 0;
+        }
+        .google-login-button {
+            display: inline-block;
+            background-color: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 20px;
+        }
+        .google-login-button:hover {
+            background-color: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>Comrade</h1>
+            <p>Sign in to continue</p>
+        </div>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        <a href="{% provider_login_url 'google' next='/map/' %}" class="google-login-button">
+            Sign in with Google
+        </a>
+    </div>
+</body>
+</html> 

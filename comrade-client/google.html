@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Login</title>
+    <!-- Add Google OAuth script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <!-- Google Sign-In button -->
+    <div id="g_id_onload"
+         data-client_id="{{ client_id }}"
+         data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="sign_in_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            // Send the token to your backend
+            fetch('/api/google-login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    access_token: response.credential
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.token) {
+                    // Store the API token
+                    localStorage.setItem('api_token', data.token);
+                    console.log('Successfully logged in!');
+                    console.log('API Token:', data.token);
+                    
+                    // You can redirect to another page or update the UI here
+                    // window.location.href = '/some-other-page';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

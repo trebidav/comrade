@@ -1,260 +1,1997 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Comrade Map</title>
-    <!-- The callback parameter is required, so we use console.debug as a noop -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6UjXEjOGGxVwUFB2lHGNk2u0_NfJZSBg&callback=initMap" async defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map - Comrade</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6UjXEjOGGxVwUFB2lHGNk2u0_NfJZSBg"></script>
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .user-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .user-info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .user-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .logout-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .logout-button:hover {
+            background: #c82333;
+        }
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .legend-text {
+            color: #666;
+        }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .friend-request {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .friend-request-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .accept-button {
+            background: #34A853;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reject-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .accept-button:hover {
+            background: #2d8f47;
+        }
+        .reject-button:hover {
+            background: #c82333;
+        }
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .friend-requests-button {
+            position: relative;
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .friend-requests-button:hover {
+            background: #357abd;
+        }
+        .tasks-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .tasks-panel h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .task-item {
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .task-item:hover {
+            background-color: #f5f5f5;
+        }
+        .task-item h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        .task-item p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .task-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            color: white;
+            background: #FBBC05;
+        }
+        /* Location sharing toggle switches */
+        .location-sharing-controls {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .location-sharing-controls h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .toggle-container span {
+            margin-left: 10px;
+        }
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        /* Account info window styles */
+        .account-info {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            min-width: 300px;
+            display: none;
+        }
+        .account-info-content h2 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .account-info-content p {
+            margin: 5px 0;
+            color: #666;
+        }
+        /* Add button to open account info */
+        .open-account-info {
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .open-account-info:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="tasks-panel">
+        <h3>My Tasks</h3>
+        <div id="my-tasks-list">
+            <!-- Tasks will be inserted here -->
+        </div>
+    </div>
+    <div class="user-info">
+        <h3>Logged in as:</h3>
+        <p id="user-name">Loading...</p>
+        <p id="user-email">Loading...</p>
+        <button class="friend-requests-button" onclick="openFriendRequestsModal()">
+            Friend Requests
+            <span id="friend-requests-badge" class="notification-badge" style="display: none;">0</span>
+        </button>
+        <button class="open-account-info" onclick="openAccountInfo()">Account Settings</button>
+        <button class="logout-button" onclick="window.location.href='{% url 'account_logout' %}?next=/login/'">Logout</button>
+    </div>
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4285F4;"></div>
+            <span class="legend-text">Your Location</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #34A853;"></div>
+            <span class="legend-text">Friends</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FBBC05;"></div>
+            <span class="legend-text">Public Shares</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #EA4335;"></div>
+            <span class="legend-text">Tasks</span>
+        </div>
+    </div>
+
+    <!-- Friend Requests Modal -->
+    <div id="friendRequestsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Friend Requests</h2>
+            </div>
+            <div id="friendRequestsList">
+                <!-- Friend requests will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Info Window -->
+    <div id="account-info" class="account-info">
+        <div class="account-info-content">
+            <h2>Account Info</h2>
+            <p>Name: <span id="user-name"></span></p>
+            <p>Email: <span id="user-email"></span></p>
+            <div class="location-sharing-controls">
+                <h3>Location Sharing</h3>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="location-sharing-enabled">
+                        <span class="slider round"></span>
+                    </label>
+                    <span>Enable Location Sharing</span>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="location-sharing-scope">
+                        <span class="slider round"></span>
+                    </label>
+                    <span>Share with Everyone (off = Friends Only)</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
+        // Get API token and user info from context
+        const apiToken = '{{ api_token }}';
+        const userInfo = JSON.parse('{{ user|safe }}');
+
+        // Store in localStorage for future use
+        localStorage.setItem('api_token', apiToken);
+        localStorage.setItem('user_info', JSON.stringify(userInfo));
+
+        // Display user info
+        document.getElementById('user-name').textContent = userInfo.name;
+        document.getElementById('user-email').textContent = userInfo.email;
+
+        // Initialize map
         let map;
         let userMarker;
-        let infoWindow;
-      
-        const socket = new WebSocket("ws://localhost:8000/ws/location/?token=a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a");
-        
+        let accuracyCircle;
+        let friendsMarkers = {};
+        let publicMarkers = {};
+        let taskMarkers = {}; // New object to store task markers
+        let ws;
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 10;
+        let reconnectTimeout;
 
-        socket.onopen = function() {
-            console.log("WebSocket connection established.");
-            startSendingLocation();  // Start sending location updates
-        };
+        // Variables to track location watching
+        let watchId = null;
+        let lastManualUpdate = 0;
+        let heartbeatInterval = null;
+        let consecutiveFailures = 0;
 
-        socket.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            console.log("Received location update:", data); // why is this not working?
-            updateUserLocation(data.latitude, data.longitude);  // Update the user's location on the map
-        };
-
-        socket.onclose = function() {
-          console.log("WebSocket connection closed.");
-        };
-    
-        socket.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
-        
-        function sendLocationUpdate(latitude, longitude) {
-            const locationData = {
-                latitude: latitude,
-                longitude: longitude
-            };
-            socket.send(JSON.stringify(locationData));
+        function getReconnectDelay() {
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, etc. up to 60s max
+            return Math.min(1000 * Math.pow(2, reconnectAttempts), 60000);
         }
-    
-        // Function to start sending location updates
-        function startSendingLocation() {
-            if (navigator.geolocation) {
-                // Send location every 5 seconds
-                setInterval(() => {
+
+        function clearMarkersAndConnection() {
+            // Stop heartbeat
+            stopHeartbeat();
+            
+            // Stop watching location
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Clear all markers
+            Object.values(friendsMarkers).forEach(marker => {
+                marker.setMap(null);
+            });
+            friendsMarkers = {};
+
+            Object.values(publicMarkers).forEach(marker => {
+                marker.setMap(null);
+            });
+            publicMarkers = {};
+
+            // Clear any pending reconnection
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
+
+            // Close WebSocket if it's open
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        }
+
+        function initWebSocket() {
+            clearMarkersAndConnection();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/location/?token=${apiToken}`);
+
+            ws.onopen = function() {
+                console.log('WebSocket connection established');
+                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+                
+                // Start heartbeat to keep connection alive
+                startHeartbeat();
+                
+                // Start sending location updates
+                startLocationUpdates();
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received WebSocket message:', data);  // Debug log
+                
+                if (data.type === 'location_update') {
+                    updateUserLocation({
+                        coords: {
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            accuracy: data.accuracy || 50
+                        }
+                    });
+                } else if (data.type === 'friend_location') {
+                    updateFriendLocation(data);
+                } else if (data.type === 'public_location') {
+                    updatePublicLocation(data);
+                } else if (data.type === 'friend_details') {
+                    // Update local user info if it's about us
+                    if (data.userId === userInfo.id) {
+                        userInfo.friends = data.friends;
+                        userInfo.skills = data.skills;
+                        localStorage.setItem('user_info', JSON.stringify(userInfo));
+                        
+                        // Update the user's info window content
+                        if (userMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            userMarker.addListener('click', () => {
+                                infoWindow.open(map, userMarker);
+                            });
+                        }
+                    } else {
+                        // Update friend marker info if it exists
+                        const friendMarker = friendsMarkers[data.userId];
+                        if (friendMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${data.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${data.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${data.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${data.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            friendMarker.addListener('click', () => {
+                                infoWindow.open(map, friendMarker);
+                            });
+                        }
+                    }
+                } else if (data.type === 'user_offline') {
+                    console.log('User went offline:', data.userId);  // Debug log
+                    // Remove the user's marker based on their relationship
+                    const friendMarker = friendsMarkers[data.userId];
+                    const publicMarker = publicMarkers[data.userId];
+                    
+                    if (friendMarker) {
+                        friendMarker.setMap(null);
+                        delete friendsMarkers[data.userId];
+                    }
+                    
+                    if (publicMarker) {
+                        publicMarker.setMap(null);
+                        delete publicMarkers[data.userId];
+                    }
+                } else if (data.type === 'heartbeat_response') {
+                    console.log('Heartbeat response received');
+                }
+            };
+
+            return ws;
+        }
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 50.0755, lng: 14.4378 }, // Prague
+                zoom: 13,
+            });
+
+            // Initialize WebSocket connection
+            ws = initWebSocket();
+            
+            // Load tasks onto the map
+            loadTasks();
+        }
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden (inactive), clear everything
+                console.log('Page hidden, clearing connections and markers');
+                clearMarkersAndConnection();
+                reconnectAttempts = 0; // Reset attempts for when we come back
+            } else {
+                // Page is visible again, reinitialize connection
+                console.log('Page visible, reconnecting...');
+                initWebSocket();
+                
+                // Force an immediate location update
+                if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const latitude = position.coords.latitude;
-                            const longitude = position.coords.longitude;
-                            console.log(`Sending location: Latitude: ${latitude}, Longitude: ${longitude}`);
-                            sendLocationUpdate(latitude, longitude);
+                        function(position) {
+                            console.log('Sending immediate location update after page became visible');
+                            const location = {
+                                type: 'location_update',
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                userId: userInfo.id,
+                                name: userInfo.name
+                            };
+                            
+                            // Wait a short time to ensure WebSocket is connected
+                            setTimeout(() => {
+                                if (ws && ws.readyState === WebSocket.OPEN) {
+                                    console.log('Immediate location update sent after visibility change');
+                                    ws.send(JSON.stringify(location));
+                                } else {
+                                    console.log('WebSocket not ready, cannot send immediate update', ws ? ws.readyState : 'no websocket');
+                                }
+                            }, 1000);
                         },
-                        (error) => {
-                            console.error("Error getting location: ", error);
+                        function(error) {
+                            console.error('Error getting immediate location:', error);
                         },
                         {
-                            enableHighAccuracy: true, // Use GPS for more accurate location
-                            maximumAge: 0, // Do not use cached location
-                            timeout: 5000 // Timeout after 5 seconds
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
                         }
                     );
-                }, 5000); // Update every 5 seconds
-            } else {
-                console.log("Geolocation is not supported by this browser.");
+                }
             }
+        });
 
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            clearMarkersAndConnection();
+        });
+
+        // Friend requests modal functions
+        function openFriendRequestsModal() {
+            document.getElementById('friendRequestsModal').style.display = 'block';
+            fetchPendingRequests();
         }
 
-        async function initMap() {
-            const { Map } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        function closeFriendRequestsModal() {
+            document.getElementById('friendRequestsModal').style.display = 'none';
+        }
 
-            map = new Map(document.getElementById("map"), {
-                center: { lat: 50, lng: 14 },
-                zoom: 8,
-                mapId: "DEMO_MAP_ID",
-              });
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('friendRequestsModal');
+            if (event.target === modal) {
+                closeFriendRequestsModal();
+            }
+        }
 
-            infoWindow = new google.maps.InfoWindow();
-
-            // Get the user's location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const userLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-
-                        // Center the map on the user's location
-                        map.setCenter(userLocation);
-                        map.setZoom(20);  // Zoom in closer
-
-                        // Add a marker for the user's location
-                        const userMarker = new google.maps.marker.AdvancedMarkerElement({
-                            position: userLocation,
-                            map: map,
-                            gmpClickable: true
-                        });
-
-                        // Fetch user details and update the tooltip
-                        fetch('/user/', {
-                            headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            const username = data.username;
-                            const skills = data.skills.join(', ');
-                            userMarker.title = `Username: ${username}\nSkills: ${skills}`;
-                        })
-                        .catch(error => {
-                            console.error("Error fetching user details:", error);
-                        });
-
-                        userMarker.addListener("click", ({ domEvent, latLng }) => {
-                            const { target } = domEvent;
-                        
-                            infoWindow.close();
-                            infoWindow.setContent(userMarker.title);
-                            infoWindow.open(userMarker.map, userMarker);
-                        });
+        async function fetchPendingRequests() {
+            try {
+                const response = await fetch('/friends/pending/', {
+                    headers: {
+                        'Authorization': `Token ${apiToken}`,
+                        'Content-Type': 'application/json'
                     },
-                    () => {
-                        handleLocationError(true, map.getCenter());
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayPendingRequests(data.pending_requests);
+                    updateRequestsBadge(data.pending_requests.length);
+                } else {
+                    console.error('Failed to fetch pending requests');
+                }
+            } catch (error) {
+                console.error('Error fetching pending requests:', error);
+            }
+        }
+
+        function updateRequestsBadge(count) {
+            const badge = document.getElementById('friend-requests-badge');
+            if (count > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = count;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function displayPendingRequests(requests) {
+            const container = document.getElementById('friendRequestsList');
+            container.innerHTML = '';
+
+            if (requests.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666;">No pending friend requests</p>';
+                return;
+            }
+
+            requests.forEach(request => {
+                const requestElement = document.createElement('div');
+                requestElement.className = 'friend-request';
+                requestElement.innerHTML = `
+                    <span>${request.first_name} ${request.last_name}</span>
+                    <div class="friend-request-buttons">
+                        <button class="accept-button" onclick="handleFriendRequest(${request.id}, 'accept')">Accept</button>
+                        <button class="reject-button" onclick="handleFriendRequest(${request.id}, 'reject')">Reject</button>
+                    </div>
+                `;
+                container.appendChild(requestElement);
+            });
+        }
+
+        async function handleFriendRequest(userId, action) {
+            const csrfToken = getCookie('csrftoken');
+            if (!csrfToken) {
+                alert('CSRF token not found. Please refresh the page.');
+                return;
+            }
+
+            try {
+                const endpoint = action === 'accept' ? 'accept' : 'reject';
+                const response = await fetch(`/friends/${endpoint}/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token ${apiToken}`
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // Refresh the pending requests list
+                    fetchPendingRequests();
+                    
+                    // If accepted, refresh the page to update friends list
+                    if (action === 'accept') {
+                        window.location.reload();
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || `Failed to ${action} friend request`);
+                }
+            } catch (error) {
+                console.error(`Error ${action}ing friend request:`, error);
+                alert(`Failed to ${action} friend request. Please try again.`);
+            }
+        }
+
+        // Check for pending requests periodically
+        setInterval(fetchPendingRequests, 30000); // Check every 30 seconds
+        // Initial check for pending requests
+        fetchPendingRequests();
+
+        function updateUserLocation(position) {
+            const lat = position.coords ? position.coords.latitude : position.latitude;
+            const lng = position.coords ? position.coords.longitude : position.longitude;
+            const accuracy = position.coords ? position.coords.accuracy : (position.accuracy || 50);
+
+            // Update or create marker
+            if (!userMarker) {
+                userMarker = new google.maps.Marker({
+                    position: { lat, lng },
+                            map: map,
+                    title: 'Your Location',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+
+                // Add info window for user's location
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
+                                <p style="margin: 4px 0; color: #666;">
+                                    ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                </p>
+                            </div>
+                            <div>
+                                <strong style="color: #666;">Skills:</strong>
+                                <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
+                userMarker.addListener('mouseover', () => {
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, userMarker);
+                    }
+                });
+
+                // Hide info window on mouseout (only if not locked)
+                userMarker.addListener('mouseout', () => {
+                    if (!isInfoWindowLocked) {
+                            infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
+                userMarker.addListener('click', () => {
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, userMarker);
+                    }
+                });
+            } else {
+                userMarker.setPosition({ lat, lng });
+            }
+
+            // Update or create accuracy circle
+            if (!accuracyCircle) {
+                accuracyCircle = new google.maps.Circle({
+                    strokeColor: '#4285F4',
+                    strokeOpacity: 0.2,
+                    strokeWeight: 1,
+                    fillColor: '#4285F4',
+                    fillOpacity: 0.1,
+                    map: map,
+                    center: { lat, lng },
+                    radius: accuracy
+                });
+            } else {
+                accuracyCircle.setCenter({ lat, lng });
+                accuracyCircle.setRadius(accuracy);
+            }
+
+            // Center map on user's location
+            map.setCenter({ lat, lng });
+            map.setZoom(15); // Zoom level for street view
+        }
+
+        function updateFriendLocation(data) {
+            const { userId, latitude, longitude, name, friends, skills } = data;
+            
+            // Check if this user is in our friends list
+            const isFriend = userInfo.friends.some(friend => friend.id === userId);
+            
+            // Create or update marker
+            if (!friendsMarkers[userId]) {
+                const marker = new google.maps.Marker({
+                    position: { lat: latitude, lng: longitude },
+                map: map,
+                    title: name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#34A853',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+
+                // Add info window with friend-specific content
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${name}</h3>
+                            ${isFriend ? `
+                                <div style="margin-bottom: 8px;">
+                                    <strong style="color: #666;">Friends (${friends?.length || 0}):</strong>
+                                    <p style="margin: 4px 0; color: #666;">
+                                        ${friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <strong style="color: #666;">Skills:</strong>
+                                    <p style="margin: 4px 0; color: #666;">${skills?.join(', ') || 'No skills listed'}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `
+                });
+
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
+                marker.addListener('mouseover', () => {
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                // Hide info window on mouseout (only if not locked)
+                marker.addListener('mouseout', () => {
+                    if (!isInfoWindowLocked) {
+                infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
+                marker.addListener('click', () => {
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                friendsMarkers[userId] = marker;
+            } else {
+                const marker = friendsMarkers[userId];
+                marker.setPosition({ lat: latitude, lng: longitude });
+            }
+        }
+
+        function updatePublicLocation(data) {
+            const { userId, latitude, longitude, name } = data;
+            
+            // Don't show add friend button if it's our own marker or already a friend
+            const isOwnMarker = userId === userInfo.id;
+            const isAlreadyFriend = userInfo.friends.some(friend => friend.id === userId);
+            
+            // Create or update marker
+            if (!publicMarkers[userId]) {
+                const marker = new google.maps.Marker({
+                    position: { lat: latitude, lng: longitude },
+                                map: map,
+                    title: name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#FBBC05',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
+                });
+
+                // Add info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px;">
+                            <h3 style="margin: 0 0 8px 0; color: #333;">${name}</h3>
+                            ${!isOwnMarker && !isAlreadyFriend ? `
+                                <button 
+                                    id="add-friend-${userId}"
+                                    style="
+                                        background: #34A853;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 15px;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        margin-top: 5px;
+                                    "
+                                >
+                                    Add to Friends
+                                </button>
+                            ` : ''}
+                        </div>
+                    `
+                });
+
+                let isInfoWindowLocked = false;
+
+                // Show info window on mouseover (only if not locked)
+                marker.addListener('mouseover', () => {
+                    if (!isInfoWindowLocked) {
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                // Hide info window on mouseout (only if not locked)
+                marker.addListener('mouseout', () => {
+                    if (!isInfoWindowLocked) {
+                                infoWindow.close();
+                    }
+                });
+
+                // Toggle info window lock on click
+                marker.addListener('click', () => {
+                    if (isInfoWindowLocked) {
+                        isInfoWindowLocked = false;
+                        infoWindow.close();
+                    } else {
+                        isInfoWindowLocked = true;
+                        infoWindow.open(map, marker);
+                        // Add click handler when locking the window
+                        if (!isOwnMarker && !isAlreadyFriend) {
+                            setTimeout(() => {
+                                const addFriendButton = document.getElementById(`add-friend-${userId}`);
+                                if (addFriendButton) {
+                                    addFriendButton.onclick = async () => {
+                                        try {
+                                            const csrfToken = getCookie('csrftoken');
+                                            if (!csrfToken) {
+                                                alert('CSRF token not found. Please refresh the page.');
+                                                return;
+                                            }
+
+                                            const response = await fetch(`/friends/send/${userId}/`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRFToken': csrfToken,
+                                                    'Authorization': `Token ${apiToken}`
+                                                },
+                                                credentials: 'include'  // Changed from same-origin to include
+                                            });
+                                            
+                                            if (response.ok) {
+                                                addFriendButton.style.backgroundColor = '#666';
+                                                addFriendButton.textContent = 'Friend Request Sent';
+                                                addFriendButton.disabled = true;
+                                            } else {
+                                                // Check if response is JSON
+                                                const contentType = response.headers.get('content-type');
+                                                if (contentType && contentType.includes('application/json')) {
+                                                    const data = await response.json();
+                                                    alert(data.error || 'Failed to send friend request');
+                                                } else {
+                                                    // Handle non-JSON response (like HTML)
+                                                    alert('Failed to send friend request. Please make sure you are logged in.');
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Error sending friend request:', error);
+                                            alert('Failed to send friend request. Please try again.');
+                                        }
+                                    };
+                                }
+                            }, 0);
+                        }
+                    }
+                });
+
+                publicMarkers[userId] = marker;
+            } else {
+                const marker = publicMarkers[userId];
+                marker.setPosition({ lat: latitude, lng: longitude });
+            }
+        }
+
+        // Helper function to get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function startHeartbeat() {
+            // Clear any existing heartbeat
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+            
+            // Send heartbeat every 5 seconds for default browsers (reduced from 30)
+            // Chrome still uses its own strategy with 30-second intervals
+            heartbeatInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    console.log('Sending heartbeat');
+                    ws.send(JSON.stringify({ type: 'heartbeat' }));
+                    
+                    // Force a location update with the heartbeat
+                    forceLocationUpdate();
+                }
+            }, 5000);
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+
+        function forceLocationUpdate() {
+            // Only force update if the last update was more than 30 seconds ago (increased from 10)
+            const now = Date.now();
+            if (now - lastManualUpdate > 30000) {
+                // Start with high accuracy if we haven't had many failures
+                const useHighAccuracy = consecutiveFailures < 3;
+                
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        sendLocationUpdate(position);
+                        lastManualUpdate = now;
+                        consecutiveFailures = 0; // Reset failures on success
+                    },
+                    function(error) {
+                        console.error('Error getting forced location update:', error);
+                        consecutiveFailures++;
+                        
+                        // If we got a timeout with high accuracy, try with low accuracy
+                        if (error.code === 3 && useHighAccuracy) {
+                            console.log('Forced update: Switching to low accuracy mode due to timeout');
+                            navigator.geolocation.getCurrentPosition(
+                                function(position) {
+                                    sendLocationUpdate(position);
+                                    lastManualUpdate = now;
+                                    console.log('Low accuracy fallback update sent');
+                                },
+                                function(error) {
+                                    console.error('Still failed with low accuracy in forced update:', error);
+                                    // Last resort: if we have a userMarker, use its position
+                                    if (userMarker) {
+                                        const position = userMarker.getPosition();
+                                        if (position) {
+                                            const fakePosition = {
+                                                coords: {
+                                                    latitude: position.lat(),
+                                                    longitude: position.lng(),
+                                                    accuracy: 100 // Default accuracy
+                                                }
+                                            };
+                                            sendLocationUpdate(fakePosition);
+                                            lastManualUpdate = now;
+                                            console.log('Used last known position for forced update');
+                                        }
+                                    }
+                                },
+                                {
+                                    enableHighAccuracy: false,
+                                    timeout: 15000,
+                                    maximumAge: 60000
+                                }
+                            );
+                        } else if (consecutiveFailures > 3 && userMarker) {
+                            // Last resort if multiple failures: use last known position
+                            const position = userMarker.getPosition();
+                            if (position) {
+                                const fakePosition = {
+                                    coords: {
+                                        latitude: position.lat(),
+                                        longitude: position.lng(),
+                                        accuracy: 100
+                                    }
+                                };
+                                sendLocationUpdate(fakePosition);
+                                lastManualUpdate = now;
+                                console.log('Used last known position for forced update after multiple failures');
+                            }
+                        }
+                    },
+                    {
+                        enableHighAccuracy: useHighAccuracy,
+                        timeout: useHighAccuracy ? 10000 : 15000,
+                        maximumAge: 30000 // Accept positions up to 30 seconds old
                     }
                 );
+            }
+        }
+
+        function sendLocationUpdate(position) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const location = {
+                    type: 'location_update',
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    userId: userInfo.id,
+                    name: userInfo.name
+                };
+                
+                console.log('Sending location update:', location);
+                ws.send(JSON.stringify(location));
             } else {
-                // Browser doesn't support Geolocation
-                handleLocationError(false, map.getCenter());
+                console.warn('WebSocket not open, cannot send location update');
+            }
+        }
+
+        function startLocationUpdates() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Track consecutive failures to adjust settings
+            let consecutiveFailures = 0;
+            let useHighAccuracy = true;
+            
+            // Detect browser type with specific iOS detection
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isIOSSafari = isIOS && isSafari;
+            
+            console.log('Browser detection - Chrome:', isChrome, 'Safari:', isSafari, 'iOS:', isIOS, 'iOS Safari:', isIOSSafari);
+            
+            // For iOS Safari, use a longer throttle period and queuing approach
+            // to handle batched updates from iOS location services
+            let lastSentTime = 0;
+            const minUpdateInterval = isIOSSafari ? 10000 : 5000; // 10 seconds for iOS Safari, 5 for others
+            let pendingUpdates = [];
+            let processingUpdate = false;
+            
+            function throttledSendLocation(position) {
+                const now = Date.now();
+                
+                // Always update UI
+                updateUserLocation({
+                    coords: {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    }
+                });
+                
+                if (isIOSSafari) {
+                    // For iOS Safari, use a queuing approach to prevent multiple simultaneous updates
+                    // Store the update
+                    pendingUpdates.push({
+                        timestamp: now,
+                        position: position
+                    });
+                    
+                    // If we're not currently processing updates, and it's been long enough since last update
+                    if (!processingUpdate && now - lastSentTime >= minUpdateInterval) {
+                        processingIOSUpdates();
+                    }
+                } else {
+                    // For other browsers, use simple throttling
+                    if (now - lastSentTime >= minUpdateInterval) {
+                        sendLocationUpdate(position);
+                        lastSentTime = now;
+                        lastManualUpdate = now;
+                        console.log('Location update sent (throttled to 5-second intervals)');
+                    }
+                }
+            }
+            
+            // Function to process queued iOS updates
+            function processingIOSUpdates() {
+                if (pendingUpdates.length === 0) {
+                    processingUpdate = false;
+                    return;
+                }
+                
+                processingUpdate = true;
+                
+                // Take the most recent position
+                const latest = pendingUpdates.reduce((latest, current) => {
+                    return current.timestamp > latest.timestamp ? current : latest;
+                }, pendingUpdates[0]);
+                
+                // Clear the queue
+                pendingUpdates = [];
+                
+                // Send the update
+                console.log('Sending iOS Safari update (batched, throttled to 10-second intervals)');
+                sendLocationUpdate(latest.position);
+                lastSentTime = Date.now();
+                lastManualUpdate = Date.now();
+                processingUpdate = false;
             }
 
-            displayTasks();  // Display tasks on the map
-        }
-    
-        function handleLocationError(browserHasGeolocation, pos) {
-            const infoWindow = new google.maps.InfoWindow();
-            infoWindow.setPosition(pos);
-            infoWindow.setContent(browserHasGeolocation ?
-                'Error: The Geolocation service failed.' :
-                'Error: Your browser doesn\'t support geolocation.');
-            infoWindow.open(map);
-        }
-
-        // Function to update the user's location on the map
-        function updateUserLocation(latitude, longitude) {
-          const newLocation = {
-              lat: latitude,
-              lng: longitude
-          };
-
-          // Update the marker position
-          if (userMarker) {
-            userMarker.position = newLocation;
-          } else {
-            // If the marker doesn't exist, create it
-            userMarker = new google.maps.marker.AdvancedMarkerElement({
-                position: newLocation,
-                map: map,
-                gmpClickable: true
-            });
-
-            fetch('/user/', {
-                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const username = data.username;
-                const skills = data.skills.join(', ');
-                userMarker.title = `Username: ${username}\nSkills: ${skills}`;
-            })
-            .catch(error => {
-                console.error("Error fetching user details:", error);
-            });
-
-            userMarker.addListener("click", ({ domEvent, latLng }) => {
-                const { target } = domEvent;
-            
-                infoWindow.close();
-                infoWindow.setContent(userMarker.title);
-                infoWindow.open(userMarker.map, userMarker);
-            });
-
-              
-            
-          }
-
-          // Optionally, center the map on the new location
-          map.setCenter(newLocation);
-        }
-
-        function displayTasks() {
-            // Get the tasks from the server
-            fetch('/tasks/', {
-                headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Tasks:", data);
-                    // Check if data is an array
-                    if (Array.isArray(data.tasks)) {
-                        // Display the tasks on the map
-                        data.tasks.forEach(task => {
-                            const taskLocation = {
-                                lat: task.lat,
-                                lng: task.lon
-                            };
-                            const taskMarker = new google.maps.marker.AdvancedMarkerElement({
-                                position: taskLocation,
-                                map: map,
-                                title: task.name,
-                                gmpClickable: true
-                            });
-                            
-                            // Add a click listener for each marker, and set up the info window.
-                            taskMarker.addListener("click", ({ domEvent, latLng }) => {
-                                const { target } = domEvent;
-                                
-                                fetch("http://localhost:8000/task/"+task.id+"/start", {
-                                    method: 'POST',
-                                    headers: { 'Authorization': 'Token a922af5f0cb0cd30abe67208e7f6a9ccc8795d0a' }
-                                    });
-                                infoWindow.close();
-                                infoWindow.setContent("<a id='button' href=http://localhost:8000/task/"+task.id+"/start target='_blank'>"+task.name+"</a>");
-                                infoWindow.open(taskMarker.map, taskMarker);
-                            });
+            if (navigator.geolocation) {
+                // First, get initial position with increased timeout
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        updateUserLocation({
+                            coords: {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            }
                         });
-                    } else {
-                        console.error("Error: Expected an array of tasks");
+                        
+                        // Send initial location
+                        sendLocationUpdate(position);
+                        lastManualUpdate = Date.now();
+                        lastSentTime = Date.now();
+                        consecutiveFailures = 0; // Reset failure counter on success
+                    },
+                    function(error) {
+                        console.error('Error getting initial location:', error);
+                        consecutiveFailures++;
+                        // Try again with lower accuracy if we had a timeout
+                        if (error.code === 3 && useHighAccuracy) {
+                            useHighAccuracy = false;
+                            console.log('Switching to low accuracy mode due to timeout');
+                            navigator.geolocation.getCurrentPosition(
+                                function(position) {
+                                    updateUserLocation({
+                                        coords: {
+                                            latitude: position.coords.latitude,
+                                            longitude: position.coords.longitude,
+                                            accuracy: position.coords.accuracy
+                                        }
+                                    });
+                                    sendLocationUpdate(position);
+                                    lastManualUpdate = Date.now();
+                                    lastSentTime = Date.now();
+                                },
+                                function(error) {
+                                    console.error('Still failed with low accuracy:', error);
+                                },
+                                {
+                                    enableHighAccuracy: false,
+                                    timeout: 15000,  // Even longer timeout for low accuracy
+                                    maximumAge: 60000 // Allow cached positions up to 1 minute
+                                }
+                            );
+                        }
+                    },
+                    {
+                        enableHighAccuracy: useHighAccuracy,
+                        timeout: 10000,  
+                        maximumAge: 30000 // Allow positions up to 30 seconds old
                     }
-                })
-                .catch(error => {
-                    console.error("Error fetching tasks:", error);
-                });
+                );
+
+                // For Chrome, use less frequent polling
+                if (isChrome) {
+                    console.log('Using Chrome-specific location strategy with reduced frequency');
+                    // Set up polling for Chrome (30 seconds)
+                    setInterval(() => {
+                        // Adjust accuracy based on previous failures
+                        const highAccuracy = consecutiveFailures < 3;
+                        
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                updateUserLocation({
+                                    coords: {
+                                        latitude: position.coords.latitude,
+                                        longitude: position.coords.longitude,
+                                        accuracy: position.coords.accuracy
+                                    }
+                                });
+                                sendLocationUpdate(position);
+                                lastManualUpdate = Date.now();
+                                lastSentTime = Date.now();
+                                consecutiveFailures = 0; // Reset failure counter
+                                console.log('Chrome polling location update sent');
+                            },
+                            function(error) {
+                                console.error('Error in Chrome location polling:', error);
+                                consecutiveFailures++;
+                                // If we're getting timeouts, try again with lower accuracy
+                                if (error.code === 3 && highAccuracy) {
+                                    navigator.geolocation.getCurrentPosition(
+                                        function(position) {
+                                            updateUserLocation({
+                                                coords: {
+                                                    latitude: position.coords.latitude,
+                                                    longitude: position.coords.longitude,
+                                                    accuracy: position.coords.accuracy
+                                                }
+                                            });
+                                            sendLocationUpdate(position);
+                                            lastManualUpdate = Date.now();
+                                            lastSentTime = Date.now();
+                                            console.log('Low accuracy fallback succeeded');
+                                        },
+                                        function(error) {
+                                            console.error('Even low accuracy failed:', error);
+                                        },
+                                        {
+                                            enableHighAccuracy: false,
+                                            timeout: 15000,
+                                            maximumAge: 60000
+                                        }
+                                    );
+                                }
+                            },
+                            {
+                                enableHighAccuracy: highAccuracy,
+                                timeout: 10000,
+                                maximumAge: 30000
+                            }
+                        );
+                    }, 30000); // Every 30 seconds for Chrome
+                } else if (isIOSSafari) {
+                    // For iOS Safari, use a reduced frequency because of iOS batching behavior
+                    console.log('Using iOS Safari-specific strategy with 10-second intervals');
+                    setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                throttledSendLocation(position);
+                            },
+                            function(error) {
+                                console.error('Error in iOS Safari polling:', error);
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 30000
+                            }
+                        );
+                    }, 10000); // Every 10 seconds for iOS Safari
+                } else {
+                    // For other browsers, use the standard 5-second interval
+                    console.log('Using default strategy with 5-second updates');
+                    setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                throttledSendLocation(position);
+                            },
+                            function(error) {
+                                console.error('Error in default browser polling:', error);
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 30000
+                            }
+                        );
+                    }, 5000); // Every 5 seconds for non-Chrome, non-iOS browsers
+                }
+
+                // Still use watchPosition but with throttling
+                watchId = navigator.geolocation.watchPosition(
+                    function(position) {
+                        // Use throttled function to limit update frequency
+                        throttledSendLocation(position);
+                        consecutiveFailures = 0; // Reset failure counter
+                    },
+                    function(error) {
+                        console.error('Error watching location:', error);
+                        consecutiveFailures++;
+                        
+                        // If watching fails, ensure heartbeat is running
+                        if (!heartbeatInterval) {
+                            startHeartbeat();
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 27000,
+                        maximumAge: 30000
+                    }
+                );
+                
+                // Fallback using stored location for emergencies
+                // Set to 5 seconds for Safari, keep 60 seconds for Chrome
+                setInterval(() => {
+                    const emergencyInterval = isChrome ? 60000 : 5000;
+                    // If we haven't updated in the interval and have failures, use the last known position
+                    const now = Date.now();
+                    if (now - lastManualUpdate > emergencyInterval && consecutiveFailures > 2) {
+                        console.log('Using last known position due to failures');
+                        // If we have a userMarker, we can use its position
+                        if (userMarker) {
+                            const position = userMarker.getPosition();
+                            if (position) {
+                                const fakePosition = {
+                                    coords: {
+                                        latitude: position.lat(),
+                                        longitude: position.lng(),
+                                        accuracy: 100 // Default accuracy
+                                    }
+                                };
+                                sendLocationUpdate(fakePosition);
+                                lastManualUpdate = now;
+                                lastSentTime = now;
+                                console.log('Sent last known position as fallback');
+                            }
+                        }
+                    }
+                }, 5000); // Check every 5 seconds for Safari/others, but logic inside handles different intervals
+            }
         }
 
+        // Function to load tasks and add them to the map
+        function loadTasks() {
+            console.log('Loading tasks...');
+            fetch('/tasks/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Tasks loaded:', data);
+                
+                // Clear existing task markers
+                Object.values(taskMarkers).forEach(markerObj => {
+                    if (markerObj && markerObj.marker) {
+                        markerObj.marker.setMap(null);
+                    }
+                });
+                taskMarkers = {};
+                
+                // Add markers for each task with location
+                if (data.tasks && data.tasks.length > 0) {
+                    data.tasks.forEach(task => {
+                        if (task.lat && task.lon) {
+                            addTaskMarker(task);
+                        }
+                    });
+                    
+                    // Update tasks panel
+                    updateTasksPanel(data.tasks);
+                }
+            })
+            .catch(error => console.error('Error loading tasks:', error));
+        }
+        
+        // Function to add a task marker to the map
+        function addTaskMarker(task) {
+            const marker = new google.maps.Marker({
+                position: { lat: task.lat, lng: task.lon },
+                map: map,
+                title: task.name,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#EA4335', // Red color for tasks
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                }
+            });
+            
+            // Check if user has the execute skill for this task
+            const canExecute = task.skill_execute_names && task.skill_execute_names.some(skillName => 
+                userInfo.skills.includes(skillName)
+            );
+            
+            // Convert task.state to number if it's a string
+            const taskState = parseInt(task.state, 10);
+            
+            // Create action buttons based on task state and user permissions
+            let actionButtons = '';
+            
+            if (canExecute) {
+                console.log(`Task ${task.id} (${task.name}) - State: ${taskState}, CanExecute: ${canExecute}`);
+                
+                if (taskState === 1) { // OPEN
+                    actionButtons = `
+                        <button 
+                            onclick="startTask(${task.id})"
+                            style="
+                                background: #34A853;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                            "
+                        >
+                            Start Task
+                        </button>
+                    `;
+                } else if (taskState === 2 && task.assignee && task.assignee.id === userInfo.id) { // IN_PROGRESS by current user
+                    actionButtons = `
+                        <button 
+                            onclick="pauseTask(${task.id})"
+                            style="
+                                background: #FBBC05;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                                margin-bottom: 5px;
+                            "
+                        >
+                            Pause Task
+                        </button>
+                        <button 
+                            onclick="finishTask(${task.id})"
+                            style="
+                                background: #4285F4;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                width: 100%;
+                            "
+                        >
+                            Finish Task
+                        </button>
+                    `;
+                } else if (taskState === 3 && task.assignee && task.assignee.id === userInfo.id) { // WAITING state and assigned to current user
+                    actionButtons = `
+                        <button 
+                            onclick="resumeTask(${task.id})"
+                            style="
+                                background: #34A853;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                            "
+                        >
+                            Resume Task
+                        </button>
+                    `;
+                }
+            }
 
+            // Add reset button
+            actionButtons += `
+                <button 
+                    onclick="debugResetTask(${task.id})"
+                    style="
+                        background: #666;
+                        color: white;
+                        border: none;
+                        padding: 8px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-top: 10px;
+                        width: 100%;
+                    "
+                >
+                    Reset Task
+                </button>
+            `;
+            
+            // Get state text
+            const stateTexts = ['Unavailable', 'Open', 'In Progress', 'Waiting', 'In Review', 'Done'];
+            const stateText = stateTexts[taskState] || 'Unknown';
+            
+            // Add info window with task details
+            const infoWindow = new google.maps.InfoWindow({
+                content: `
+                    <div style="padding: 12px; min-width: 200px;">
+                        <h3 style="margin: 0 0 8px 0; color: #333;">${task.name}</h3>
+                        <p style="margin: 4px 0; color: #666;">${task.description}</p>
+                        <div style="margin: 8px 0;">
+                            <strong style="color: #666;">Status:</strong> 
+                            <span style="color: #666;">${stateText}</span>
+                        </div>
+                        ${task.assignee ? 
+                            `<div style="margin: 8px 0;">
+                                <strong style="color: #666;">Assigned to:</strong> 
+                                <span style="color: #666;">${task.assignee && task.assignee.id === userInfo.id ? 'You' : 
+                                  (task.assignee_name || 'Nobody')}</span>
+                            </div>` : ''
+                        }
+                        <div style="margin: 8px 0;">
+                            <strong style="color: #666;">Skills Required:</strong> 
+                            <span style="color: #666;">${task.skill_execute_names && task.skill_execute_names.length > 0 ? 
+                              task.skill_execute_names.join(', ') : 'None'}</span>
+                        </div>
+                        ${actionButtons}
+                    </div>
+                `
+            });
+            
+            let isInfoWindowLocked = false;
+            
+            // Show info window on mouseover (only if not locked)
+            marker.addListener('mouseover', () => {
+                if (!isInfoWindowLocked) {
+                    infoWindow.open(map, marker);
+                }
+            });
+            
+            // Hide info window on mouseout (only if not locked)
+            marker.addListener('mouseout', () => {
+                if (!isInfoWindowLocked) {
+                    infoWindow.close();
+                }
+            });
+            
+            // Toggle info window lock on click
+            marker.addListener('click', () => {
+                if (isInfoWindowLocked) {
+                    isInfoWindowLocked = false;
+                    infoWindow.close();
+                } else {
+                    isInfoWindowLocked = true;
+                    infoWindow.open(map, marker);
+                }
+            });
+            
+            // Store marker reference
+            taskMarkers[task.id] = {
+                marker: marker,
+                infoWindow: infoWindow,
+                task: task
+            };
+        }
+        
+        // Function to start a task
+        function startTask(taskId) {
+            fetch(`/task/${taskId}/start`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to start task');
+                });
+            })
+            .then(data => console.log('Start task response:', data))
+            .catch(error => {
+                console.error('Error starting task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to finish a task
+        function finishTask(taskId) {
+            fetch(`/task/${taskId}/finish`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to finish task');
+                });
+            })
+            .then(data => console.log('Finish task response:', data))
+            .catch(error => {
+                console.error('Error finishing task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to pause a task
+        function pauseTask(taskId) {
+            fetch(`/task/${taskId}/pause`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to pause task');
+                });
+            })
+            .then(data => console.log('Pause task response:', data))
+            .catch(error => {
+                console.error('Error pausing task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to resume a task
+        function resumeTask(taskId) {
+            fetch(`/task/${taskId}/resume`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to resume task');
+                });
+            })
+            .then(data => console.log('Resume task response:', data))
+            .catch(error => {
+                console.error('Error resuming task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to debug reset a task
+        function debugResetTask(taskId) {
+            fetch(`/task/${taskId}/debug_reset`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to reset task');
+                });
+            })
+            .then(data => console.log('Debug reset task response:', data))
+            .catch(error => {
+                console.error('Error resetting task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Refresh tasks periodically
+        setInterval(loadTasks, 30000); // Refresh every 30 seconds
+
+        // Function to update the tasks panel
+        function updateTasksPanel(tasks) {
+            const myTasksList = document.getElementById('my-tasks-list');
+            const userId = userInfo.id;
+            
+            console.log('Updating tasks panel with user ID:', userId);
+            console.log('Tasks:', tasks);
+            
+            // Filter tasks that are assigned to the current user and in progress
+            const myTasks = tasks.filter(task => 
+                task.assignee && 
+                task.assignee === userId && 
+                (task.state === 2 || task.state === 3) // IN_PROGRESS or WAITING
+            );
+            
+            console.log('Filtered tasks:', myTasks);
+            
+            // Clear current list
+            myTasksList.innerHTML = '';
+            
+            if (myTasks.length === 0) {
+                myTasksList.innerHTML = '<p style="color: #666; text-align: center;">No tasks in progress</p>';
+                return;
+            }
+            
+            // Add each task
+            myTasks.forEach(task => {
+                const stateText = task.state === 2 ? 'In Progress' : 'Waiting';
+                const stateColor = task.state === 2 ? '#34A853' : '#FBBC05';
+                
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item';
+                taskElement.innerHTML = `
+                    <h4>${task.name}</h4>
+                    <p>${task.description || 'No description'}</p>
+                    <span class="task-status" style="background: ${stateColor}">${stateText}</span>
+                `;
+                
+                // Add click handler to center map on task
+                taskElement.onclick = () => {
+                    if (task.lat && task.lon) {
+                        map.setCenter({ lat: task.lat, lng: task.lon });
+                        map.setZoom(15);
+                    }
+                };
+                
+                myTasksList.appendChild(taskElement);
+            });
+        }
+
+        // Function to update location sharing preferences
+        async function updateLocationSharingPreferences() {
+            const enabled = document.getElementById('location-sharing-enabled').checked;
+            const shareWithAll = document.getElementById('location-sharing-scope').checked;
+            
+            const sharingLevel = enabled ? (shareWithAll ? 'all' : 'friends') : 'none';
+            
+            try {
+                const response = await fetch('/location/preferences/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Authorization': `Token ${apiToken}`
+                    },
+                    body: JSON.stringify({
+                        sharing_level: sharingLevel
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update location sharing preferences');
+                }
+                
+                console.log('Location sharing preferences updated successfully');
+            } catch (error) {
+                console.error('Error updating location sharing preferences:', error);
+            }
+        }
+
+        // Function to get current location sharing preferences
+        async function getLocationSharingPreferences() {
+            try {
+                const response = await fetch('/location/preferences/', {
+                    headers: {
+                        'Authorization': `Token ${apiToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to get location sharing preferences');
+                }
+                
+                const preferences = await response.json();
+                
+                // Update toggle switches
+                const enabled = preferences.sharing_level !== 'none';
+                const shareWithAll = preferences.sharing_level === 'all';
+                
+                document.getElementById('location-sharing-enabled').checked = enabled;
+                document.getElementById('location-sharing-scope').checked = shareWithAll;
+            } catch (error) {
+                console.error('Error getting location sharing preferences:', error);
+            }
+        }
+
+        // Add event listeners for toggle switches
+        document.getElementById('location-sharing-enabled').addEventListener('change', updateLocationSharingPreferences);
+        document.getElementById('location-sharing-scope').addEventListener('change', updateLocationSharingPreferences);
+
+        // Get initial preferences when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            getLocationSharingPreferences();
+        });
+
+        // Function to open account info window
+        function openAccountInfo() {
+            document.getElementById('account-info').style.display = 'block';
+        }
+
+        // Function to close account info window
+        function closeAccountInfo() {
+            document.getElementById('account-info').style.display = 'none';
+        }
+
+        // Close account info when clicking outside
+        window.addEventListener('click', function(event) {
+            const accountInfo = document.getElementById('account-info');
+            if (event.target === accountInfo) {
+                closeAccountInfo();
+            }
+        });
+
+        // Add close button to account info window
+        document.querySelector('.account-info-content').insertAdjacentHTML('afterbegin', `
+            <button 
+                onclick="closeAccountInfo()" 
+                style="
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: none;
+                    border: none;
+                    font-size: 20px;
+                    cursor: pointer;
+                    color: #666;
+                "
+            >×</button>
+        `);
+
+        // Initial WebSocket connection
+        initMap();
     </script>
-    <style>
-      /* Always set the map height explicitly to define the size of the div
-       * element that contains the map. */
-      #map {
-        height: 100%;
-      }
-
-      /* Optional: Makes the sample page fill the window. */
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>User Location Map</h1>
-    <div id="map"></div>
   </body>
 </html>

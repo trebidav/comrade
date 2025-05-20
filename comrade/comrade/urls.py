@@ -16,13 +16,14 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include, path
-from rest_framework import routers
+from django.urls import path, include
+from comrade_core import views
 
 urlpatterns = [
-    path("", include("comrade_core.urls")),
-    path("admin/", admin.site.urls),
-    path("api-auth/", include("rest_framework.urls")),
-    path("accounts/", include("allauth.urls")),
-    path("_allauth/", include("allauth.headless.urls")),
+    path('admin/', admin.site.urls),
+    path('', include('comrade_core.urls')),  # Include all comrade_core URLs
+    path('accounts/', include('allauth.urls')),  # allauth URLs for social auth
+    path('login/', views.login_page, name='login_page'),  # Keep our custom login page
+    path('map/', views.map, name='map'),
+    path('api/user/info/', views.get_user_info, name='get_user_info'),
 ]
