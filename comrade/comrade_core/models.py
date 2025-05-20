@@ -330,6 +330,14 @@ class Task(models.Model):
         self.state = Task.State.DONE
         self.save()
 
+    def debug_reset(self):
+        """Debug method to reset task to OPEN state"""
+        self.state = Task.State.OPEN
+        self.assignee = None
+        self.datetime_start = None
+        self.datetime_finish = None
+        self.save()
+
 
 class Rating(models.Model):
     task = models.ForeignKey(

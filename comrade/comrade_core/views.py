@@ -30,6 +30,7 @@ from django.utils.decorators import method_decorator
 import json
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.db import models
 
 User = get_user_model()
 
@@ -251,16 +252,91 @@ class TaskFinishView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class TaskPauseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, taskId: int):
+        task = None
+        try:
+            task = Task.objects.get(pk=taskId)
+        except Task.DoesNotExist as e:
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            task.pause(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+
+        return Response(
+            {"message": "Task paused!"},
+            status=status.HTTP_200_OK,
+        )
+
+class TaskResumeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, taskId: int):
+        task = None
+        try:
+            task = Task.objects.get(pk=taskId)
+        except Task.DoesNotExist as e:
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            task.resume(request.user)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+
+        return Response(
+            {"message": "Task resumed!"},
+            status=status.HTTP_200_OK,
+        )
+
 class TaskListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        tasks = Task.objects.filter(skill_read__in=user.skills.all())
+        # Get tasks that are:
+        # 1. IN_PROGRESS or WAITING and assigned to the current user
+        # 2. OPEN and user has the required execute skills
+        tasks = Task.objects.filter(
+            (
+                models.Q(state=Task.State.IN_PROGRESS) | 
+                models.Q(state=Task.State.WAITING)
+            ) & models.Q(assignee=user) |
+            (
+                models.Q(state=Task.State.OPEN) & 
+                models.Q(skill_execute__in=user.skills.all())
+            )
+        ).distinct()
+        
+        # For debugging: count tasks that have location data
+        tasks_with_location = tasks.exclude(lat__isnull=True).exclude(lon__isnull=True).count()
+        print(f"Found {tasks.count()} tasks for user {user} ({tasks_with_location} with location)")
+        
         serializer = TaskSerializer(tasks, many=True)
         return Response(
             {"tasks": serializer.data},
             status=status.HTTP_200_OK,
+        )
+
+class TaskDebugResetView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, taskId: int):
+        try:
+            task = Task.objects.get(pk=taskId)
+        except Task.DoesNotExist:
+            return Response(
+                {"error": "Task not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        task.debug_reset()
+        return Response(
+            {"message": "Task reset to OPEN state"},
+            status=status.HTTP_200_OK
         )
 
 @api_view(['POST'])

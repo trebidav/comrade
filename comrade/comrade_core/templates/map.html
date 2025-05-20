@@ -161,10 +161,61 @@
         .friend-requests-button:hover {
             background: #357abd;
         }
+        .tasks-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .tasks-panel h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .task-item {
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .task-item:hover {
+            background-color: #f5f5f5;
+        }
+        .task-item h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        .task-item p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .task-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            color: white;
+            background: #FBBC05;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="tasks-panel">
+        <h3>My Tasks</h3>
+        <div id="my-tasks-list">
+            <!-- Tasks will be inserted here -->
+        </div>
+    </div>
     <div class="user-info">
         <h3>Logged in as:</h3>
         <p id="user-name">Loading...</p>
@@ -187,6 +238,10 @@
         <div class="legend-item">
             <div class="legend-color" style="background: #FBBC05;"></div>
             <span class="legend-text">Public Shares</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #EA4335;"></div>
+            <span class="legend-text">Tasks</span>
         </div>
     </div>
 
@@ -221,6 +276,7 @@
         let accuracyCircle;
         let friendsMarkers = {};
         let publicMarkers = {};
+        let taskMarkers = {}; // New object to store task markers
         let ws;
         let reconnectAttempts = 0;
         let maxReconnectAttempts = 10;
@@ -389,6 +445,9 @@
 
             // Initialize WebSocket connection
             ws = initWebSocket();
+            
+            // Load tasks onto the map
+            loadTasks();
         }
 
         // Handle page visibility changes
@@ -1284,6 +1343,423 @@
                     }
                 }, 5000); // Check every 5 seconds for Safari/others, but logic inside handles different intervals
             }
+        }
+
+        // Function to load tasks and add them to the map
+        function loadTasks() {
+            console.log('Loading tasks...');
+            fetch('/tasks/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Tasks loaded:', data);
+                
+                // Clear existing task markers
+                Object.values(taskMarkers).forEach(markerObj => {
+                    if (markerObj && markerObj.marker) {
+                        markerObj.marker.setMap(null);
+                    }
+                });
+                taskMarkers = {};
+                
+                // Add markers for each task with location
+                if (data.tasks && data.tasks.length > 0) {
+                    data.tasks.forEach(task => {
+                        if (task.lat && task.lon) {
+                            addTaskMarker(task);
+                        }
+                    });
+                    
+                    // Update tasks panel
+                    updateTasksPanel(data.tasks);
+                }
+            })
+            .catch(error => console.error('Error loading tasks:', error));
+        }
+        
+        // Function to add a task marker to the map
+        function addTaskMarker(task) {
+            const marker = new google.maps.Marker({
+                position: { lat: task.lat, lng: task.lon },
+                map: map,
+                title: task.name,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#EA4335', // Red color for tasks
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                }
+            });
+            
+            // Check if user has the execute skill for this task
+            const canExecute = task.skill_execute_names && task.skill_execute_names.some(skillName => 
+                userInfo.skills.includes(skillName)
+            );
+            
+            // Convert task.state to number if it's a string
+            const taskState = parseInt(task.state, 10);
+            
+            // Create action buttons based on task state and user permissions
+            let actionButtons = '';
+            
+            if (canExecute) {
+                console.log(`Task ${task.id} (${task.name}) - State: ${taskState}, CanExecute: ${canExecute}`);
+                
+                if (taskState === 1) { // OPEN
+                    actionButtons = `
+                        <button 
+                            onclick="startTask(${task.id})"
+                            style="
+                                background: #34A853;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                            "
+                        >
+                            Start Task
+                        </button>
+                    `;
+                } else if (taskState === 2 && task.assignee && task.assignee.id === userInfo.id) { // IN_PROGRESS by current user
+                    actionButtons = `
+                        <button 
+                            onclick="pauseTask(${task.id})"
+                            style="
+                                background: #FBBC05;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                                margin-bottom: 5px;
+                            "
+                        >
+                            Pause Task
+                        </button>
+                        <button 
+                            onclick="finishTask(${task.id})"
+                            style="
+                                background: #4285F4;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                width: 100%;
+                            "
+                        >
+                            Finish Task
+                        </button>
+                    `;
+                } else if (taskState === 3 && task.assignee && task.assignee.id === userInfo.id) { // WAITING state and assigned to current user
+                    actionButtons = `
+                        <button 
+                            onclick="resumeTask(${task.id})"
+                            style="
+                                background: #34A853;
+                                color: white;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 5px;
+                                width: 100%;
+                            "
+                        >
+                            Resume Task
+                        </button>
+                    `;
+                }
+            }
+
+            // Add reset button
+            actionButtons += `
+                <button 
+                    onclick="debugResetTask(${task.id})"
+                    style="
+                        background: #666;
+                        color: white;
+                        border: none;
+                        padding: 8px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-top: 10px;
+                        width: 100%;
+                    "
+                >
+                    Reset Task
+                </button>
+            `;
+            
+            // Get state text
+            const stateTexts = ['Unavailable', 'Open', 'In Progress', 'Waiting', 'In Review', 'Done'];
+            const stateText = stateTexts[taskState] || 'Unknown';
+            
+            // Add info window with task details
+            const infoWindow = new google.maps.InfoWindow({
+                content: `
+                    <div style="padding: 12px; min-width: 200px;">
+                        <h3 style="margin: 0 0 8px 0; color: #333;">${task.name}</h3>
+                        <p style="margin: 4px 0; color: #666;">${task.description}</p>
+                        <div style="margin: 8px 0;">
+                            <strong style="color: #666;">Status:</strong> 
+                            <span style="color: #666;">${stateText}</span>
+                        </div>
+                        ${task.assignee ? 
+                            `<div style="margin: 8px 0;">
+                                <strong style="color: #666;">Assigned to:</strong> 
+                                <span style="color: #666;">${task.assignee && task.assignee.id === userInfo.id ? 'You' : 
+                                  (task.assignee_name || 'Nobody')}</span>
+                            </div>` : ''
+                        }
+                        <div style="margin: 8px 0;">
+                            <strong style="color: #666;">Skills Required:</strong> 
+                            <span style="color: #666;">${task.skill_execute_names && task.skill_execute_names.length > 0 ? 
+                              task.skill_execute_names.join(', ') : 'None'}</span>
+                        </div>
+                        ${actionButtons}
+                    </div>
+                `
+            });
+            
+            let isInfoWindowLocked = false;
+            
+            // Show info window on mouseover (only if not locked)
+            marker.addListener('mouseover', () => {
+                if (!isInfoWindowLocked) {
+                    infoWindow.open(map, marker);
+                }
+            });
+            
+            // Hide info window on mouseout (only if not locked)
+            marker.addListener('mouseout', () => {
+                if (!isInfoWindowLocked) {
+                    infoWindow.close();
+                }
+            });
+            
+            // Toggle info window lock on click
+            marker.addListener('click', () => {
+                if (isInfoWindowLocked) {
+                    isInfoWindowLocked = false;
+                    infoWindow.close();
+                } else {
+                    isInfoWindowLocked = true;
+                    infoWindow.open(map, marker);
+                }
+            });
+            
+            // Store marker reference
+            taskMarkers[task.id] = {
+                marker: marker,
+                infoWindow: infoWindow,
+                task: task
+            };
+        }
+        
+        // Function to start a task
+        function startTask(taskId) {
+            fetch(`/task/${taskId}/start`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to start task');
+                });
+            })
+            .then(data => console.log('Start task response:', data))
+            .catch(error => {
+                console.error('Error starting task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to finish a task
+        function finishTask(taskId) {
+            fetch(`/task/${taskId}/finish`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to finish task');
+                });
+            })
+            .then(data => console.log('Finish task response:', data))
+            .catch(error => {
+                console.error('Error finishing task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to pause a task
+        function pauseTask(taskId) {
+            fetch(`/task/${taskId}/pause`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to pause task');
+                });
+            })
+            .then(data => console.log('Pause task response:', data))
+            .catch(error => {
+                console.error('Error pausing task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to resume a task
+        function resumeTask(taskId) {
+            fetch(`/task/${taskId}/resume`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to resume task');
+                });
+            })
+            .then(data => console.log('Resume task response:', data))
+            .catch(error => {
+                console.error('Error resuming task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Function to debug reset a task
+        function debugResetTask(taskId) {
+            fetch(`/task/${taskId}/debug_reset`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload tasks to update their state
+                    loadTasks();
+                    return response.json();
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to reset task');
+                });
+            })
+            .then(data => console.log('Debug reset task response:', data))
+            .catch(error => {
+                console.error('Error resetting task:', error);
+                alert(`Error: ${error.message}`);
+            });
+        }
+        
+        // Refresh tasks periodically
+        setInterval(loadTasks, 30000); // Refresh every 30 seconds
+
+        // Function to update the tasks panel
+        function updateTasksPanel(tasks) {
+            const myTasksList = document.getElementById('my-tasks-list');
+            const userId = userInfo.id;
+            
+            console.log('Updating tasks panel with user ID:', userId);
+            console.log('Tasks:', tasks);
+            
+            // Filter tasks that are assigned to the current user and in progress
+            const myTasks = tasks.filter(task => 
+                task.assignee && 
+                task.assignee === userId && 
+                (task.state === 2 || task.state === 3) // IN_PROGRESS or WAITING
+            );
+            
+            console.log('Filtered tasks:', myTasks);
+            
+            // Clear current list
+            myTasksList.innerHTML = '';
+            
+            if (myTasks.length === 0) {
+                myTasksList.innerHTML = '<p style="color: #666; text-align: center;">No tasks in progress</p>';
+                return;
+            }
+            
+            // Add each task
+            myTasks.forEach(task => {
+                const stateText = task.state === 2 ? 'In Progress' : 'Waiting';
+                const stateColor = task.state === 2 ? '#34A853' : '#FBBC05';
+                
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item';
+                taskElement.innerHTML = `
+                    <h4>${task.name}</h4>
+                    <p>${task.description || 'No description'}</p>
+                    <span class="task-status" style="background: ${stateColor}">${stateText}</span>
+                `;
+                
+                // Add click handler to center map on task
+                taskElement.onclick = () => {
+                    if (task.lat && task.lon) {
+                        map.setCenter({ lat: task.lat, lng: task.lon });
+                        map.setZoom(15);
+                    }
+                };
+                
+                myTasksList.appendChild(taskElement);
+            });
         }
 
         // Initial WebSocket connection
