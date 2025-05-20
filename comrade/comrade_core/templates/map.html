@@ -206,6 +206,107 @@
             color: white;
             background: #FBBC05;
         }
+        /* Location sharing toggle switches */
+        .location-sharing-controls {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .location-sharing-controls h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .toggle-container span {
+            margin-left: 10px;
+        }
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        /* Account info window styles */
+        .account-info {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            min-width: 300px;
+            display: none;
+        }
+        .account-info-content h2 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .account-info-content p {
+            margin: 5px 0;
+            color: #666;
+        }
+        /* Add button to open account info */
+        .open-account-info {
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .open-account-info:hover {
+            background: #357abd;
+        }
     </style>
 </head>
 <body>
@@ -224,6 +325,7 @@
             Friend Requests
             <span id="friend-requests-badge" class="notification-badge" style="display: none;">0</span>
         </button>
+        <button class="open-account-info" onclick="openAccountInfo()">Account Settings</button>
         <button class="logout-button" onclick="window.location.href='{% url 'account_logout' %}?next=/login/'">Logout</button>
     </div>
     <div class="legend">
@@ -253,6 +355,32 @@
             </div>
             <div id="friendRequestsList">
                 <!-- Friend requests will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Info Window -->
+    <div id="account-info" class="account-info">
+        <div class="account-info-content">
+            <h2>Account Info</h2>
+            <p>Name: <span id="user-name"></span></p>
+            <p>Email: <span id="user-email"></span></p>
+            <div class="location-sharing-controls">
+                <h3>Location Sharing</h3>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="location-sharing-enabled">
+                        <span class="slider round"></span>
+                    </label>
+                    <span>Enable Location Sharing</span>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="location-sharing-scope">
+                        <span class="slider round"></span>
+                    </label>
+                    <span>Share with Everyone (off = Friends Only)</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1761,6 +1889,106 @@
                 myTasksList.appendChild(taskElement);
             });
         }
+
+        // Function to update location sharing preferences
+        async function updateLocationSharingPreferences() {
+            const enabled = document.getElementById('location-sharing-enabled').checked;
+            const shareWithAll = document.getElementById('location-sharing-scope').checked;
+            
+            const sharingLevel = enabled ? (shareWithAll ? 'all' : 'friends') : 'none';
+            
+            try {
+                const response = await fetch('/location/preferences/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Authorization': `Token ${apiToken}`
+                    },
+                    body: JSON.stringify({
+                        sharing_level: sharingLevel
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update location sharing preferences');
+                }
+                
+                console.log('Location sharing preferences updated successfully');
+            } catch (error) {
+                console.error('Error updating location sharing preferences:', error);
+            }
+        }
+
+        // Function to get current location sharing preferences
+        async function getLocationSharingPreferences() {
+            try {
+                const response = await fetch('/location/preferences/', {
+                    headers: {
+                        'Authorization': `Token ${apiToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to get location sharing preferences');
+                }
+                
+                const preferences = await response.json();
+                
+                // Update toggle switches
+                const enabled = preferences.sharing_level !== 'none';
+                const shareWithAll = preferences.sharing_level === 'all';
+                
+                document.getElementById('location-sharing-enabled').checked = enabled;
+                document.getElementById('location-sharing-scope').checked = shareWithAll;
+            } catch (error) {
+                console.error('Error getting location sharing preferences:', error);
+            }
+        }
+
+        // Add event listeners for toggle switches
+        document.getElementById('location-sharing-enabled').addEventListener('change', updateLocationSharingPreferences);
+        document.getElementById('location-sharing-scope').addEventListener('change', updateLocationSharingPreferences);
+
+        // Get initial preferences when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            getLocationSharingPreferences();
+        });
+
+        // Function to open account info window
+        function openAccountInfo() {
+            document.getElementById('account-info').style.display = 'block';
+        }
+
+        // Function to close account info window
+        function closeAccountInfo() {
+            document.getElementById('account-info').style.display = 'none';
+        }
+
+        // Close account info when clicking outside
+        window.addEventListener('click', function(event) {
+            const accountInfo = document.getElementById('account-info');
+            if (event.target === accountInfo) {
+                closeAccountInfo();
+            }
+        });
+
+        // Add close button to account info window
+        document.querySelector('.account-info-content').insertAdjacentHTML('afterbegin', `
+            <button 
+                onclick="closeAccountInfo()" 
+                style="
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: none;
+                    border: none;
+                    font-size: 20px;
+                    cursor: pointer;
+                    color: #666;
+                "
+            >×</button>
+        `);
 
         // Initial WebSocket connection
         initMap();

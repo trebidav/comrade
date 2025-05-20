@@ -21,6 +21,7 @@ urlpatterns = [
     path('friends/', views.get_friends, name='get_friends'),
     path('friends/pending/', views.get_pending_requests, name='get_pending_requests'),
     path('friends/sent/', views.get_sent_requests, name='get_sent_requests'),
+    path('location/preferences/', views.LocationSharingPreferencesView.as_view(), name='location_preferences'),
 ]
 
 websocket_urlpatterns = [

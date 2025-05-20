@@ -463,3 +463,27 @@ def get_user_info(request):
             "name": f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
         }
     }, status=status.HTTP_200_OK)
+
+class LocationSharingPreferencesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Get current location sharing preferences"""
+        preferences = request.user.get_location_sharing_preferences()
+        return Response(preferences, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """Update location sharing preferences"""
+        sharing_level = request.data.get('sharing_level')
+        
+        if sharing_level not in dict(User.SharingLevel.choices):
+            return Response(
+                {"error": "Invalid sharing level"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request.user.update_location_sharing_preferences(sharing_level=sharing_level)
+        
+        # Get updated preferences
+        preferences = request.user.get_location_sharing_preferences()
+        return Response(preferences, status=status.HTTP_200_OK)
