@@ -230,6 +230,7 @@
         let watchId = null;
         let lastManualUpdate = 0;
         let heartbeatInterval = null;
+        let consecutiveFailures = 0;
 
         function getReconnectDelay() {
             // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, etc. up to 60s max
@@ -878,7 +879,8 @@
                 clearInterval(heartbeatInterval);
             }
             
-            // Send heartbeat every 10 seconds (reduced from 15)
+            // Send heartbeat every 5 seconds for default browsers (reduced from 30)
+            // Chrome still uses its own strategy with 30-second intervals
             heartbeatInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     console.log('Sending heartbeat');
@@ -887,7 +889,7 @@
                     // Force a location update with the heartbeat
                     forceLocationUpdate();
                 }
-            }, 10000);
+            }, 5000);
         }
 
         function stopHeartbeat() {
@@ -898,21 +900,77 @@
         }
 
         function forceLocationUpdate() {
-            // Only force update if the last update was more than 10 seconds ago
+            // Only force update if the last update was more than 30 seconds ago (increased from 10)
             const now = Date.now();
-            if (now - lastManualUpdate > 10000) {
+            if (now - lastManualUpdate > 30000) {
+                // Start with high accuracy if we haven't had many failures
+                const useHighAccuracy = consecutiveFailures < 3;
+                
                 navigator.geolocation.getCurrentPosition(
                     function(position) {
                         sendLocationUpdate(position);
                         lastManualUpdate = now;
+                        consecutiveFailures = 0; // Reset failures on success
                     },
                     function(error) {
                         console.error('Error getting forced location update:', error);
+                        consecutiveFailures++;
+                        
+                        // If we got a timeout with high accuracy, try with low accuracy
+                        if (error.code === 3 && useHighAccuracy) {
+                            console.log('Forced update: Switching to low accuracy mode due to timeout');
+                            navigator.geolocation.getCurrentPosition(
+                                function(position) {
+                                    sendLocationUpdate(position);
+                                    lastManualUpdate = now;
+                                    console.log('Low accuracy fallback update sent');
+                                },
+                                function(error) {
+                                    console.error('Still failed with low accuracy in forced update:', error);
+                                    // Last resort: if we have a userMarker, use its position
+                                    if (userMarker) {
+                                        const position = userMarker.getPosition();
+                                        if (position) {
+                                            const fakePosition = {
+                                                coords: {
+                                                    latitude: position.lat(),
+                                                    longitude: position.lng(),
+                                                    accuracy: 100 // Default accuracy
+                                                }
+                                            };
+                                            sendLocationUpdate(fakePosition);
+                                            lastManualUpdate = now;
+                                            console.log('Used last known position for forced update');
+                                        }
+                                    }
+                                },
+                                {
+                                    enableHighAccuracy: false,
+                                    timeout: 15000,
+                                    maximumAge: 60000
+                                }
+                            );
+                        } else if (consecutiveFailures > 3 && userMarker) {
+                            // Last resort if multiple failures: use last known position
+                            const position = userMarker.getPosition();
+                            if (position) {
+                                const fakePosition = {
+                                    coords: {
+                                        latitude: position.lat(),
+                                        longitude: position.lng(),
+                                        accuracy: 100
+                                    }
+                                };
+                                sendLocationUpdate(fakePosition);
+                                lastManualUpdate = now;
+                                console.log('Used last known position for forced update after multiple failures');
+                            }
+                        }
                     },
                     {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
+                        enableHighAccuracy: useHighAccuracy,
+                        timeout: useHighAccuracy ? 10000 : 15000,
+                        maximumAge: 30000 // Accept positions up to 30 seconds old
                     }
                 );
             }
@@ -946,6 +1004,81 @@
             let consecutiveFailures = 0;
             let useHighAccuracy = true;
             
+            // Detect browser type with specific iOS detection
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isIOSSafari = isIOS && isSafari;
+            
+            console.log('Browser detection - Chrome:', isChrome, 'Safari:', isSafari, 'iOS:', isIOS, 'iOS Safari:', isIOSSafari);
+            
+            // For iOS Safari, use a longer throttle period and queuing approach
+            // to handle batched updates from iOS location services
+            let lastSentTime = 0;
+            const minUpdateInterval = isIOSSafari ? 10000 : 5000; // 10 seconds for iOS Safari, 5 for others
+            let pendingUpdates = [];
+            let processingUpdate = false;
+            
+            function throttledSendLocation(position) {
+                const now = Date.now();
+                
+                // Always update UI
+                updateUserLocation({
+                    coords: {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    }
+                });
+                
+                if (isIOSSafari) {
+                    // For iOS Safari, use a queuing approach to prevent multiple simultaneous updates
+                    // Store the update
+                    pendingUpdates.push({
+                        timestamp: now,
+                        position: position
+                    });
+                    
+                    // If we're not currently processing updates, and it's been long enough since last update
+                    if (!processingUpdate && now - lastSentTime >= minUpdateInterval) {
+                        processingIOSUpdates();
+                    }
+                } else {
+                    // For other browsers, use simple throttling
+                    if (now - lastSentTime >= minUpdateInterval) {
+                        sendLocationUpdate(position);
+                        lastSentTime = now;
+                        lastManualUpdate = now;
+                        console.log('Location update sent (throttled to 5-second intervals)');
+                    }
+                }
+            }
+            
+            // Function to process queued iOS updates
+            function processingIOSUpdates() {
+                if (pendingUpdates.length === 0) {
+                    processingUpdate = false;
+                    return;
+                }
+                
+                processingUpdate = true;
+                
+                // Take the most recent position
+                const latest = pendingUpdates.reduce((latest, current) => {
+                    return current.timestamp > latest.timestamp ? current : latest;
+                }, pendingUpdates[0]);
+                
+                // Clear the queue
+                pendingUpdates = [];
+                
+                // Send the update
+                console.log('Sending iOS Safari update (batched, throttled to 10-second intervals)');
+                sendLocationUpdate(latest.position);
+                lastSentTime = Date.now();
+                lastManualUpdate = Date.now();
+                processingUpdate = false;
+            }
+
             if (navigator.geolocation) {
                 // First, get initial position with increased timeout
                 navigator.geolocation.getCurrentPosition(
@@ -961,6 +1094,7 @@
                         // Send initial location
                         sendLocationUpdate(position);
                         lastManualUpdate = Date.now();
+                        lastSentTime = Date.now();
                         consecutiveFailures = 0; // Reset failure counter on success
                     },
                     function(error) {
@@ -981,6 +1115,7 @@
                                     });
                                     sendLocationUpdate(position);
                                     lastManualUpdate = Date.now();
+                                    lastSentTime = Date.now();
                                 },
                                 function(error) {
                                     console.error('Still failed with low accuracy:', error);
@@ -995,19 +1130,15 @@
                     },
                     {
                         enableHighAccuracy: useHighAccuracy,
-                        timeout: 10000,  // Increased from 5000 to 10000
+                        timeout: 10000,  
                         maximumAge: 30000 // Allow positions up to 30 seconds old
                     }
                 );
 
-                // Detect Chrome browser
-                const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-                console.log('Browser detection - Chrome:', isChrome);
-
-                // For Chrome, rely more on polling than watchPosition
+                // For Chrome, use less frequent polling
                 if (isChrome) {
-                    console.log('Using Chrome-specific location strategy');
-                    // Set up more frequent polling for Chrome (every 10 seconds instead of 5)
+                    console.log('Using Chrome-specific location strategy with reduced frequency');
+                    // Set up polling for Chrome (30 seconds)
                     setInterval(() => {
                         // Adjust accuracy based on previous failures
                         const highAccuracy = consecutiveFailures < 3;
@@ -1023,6 +1154,7 @@
                                 });
                                 sendLocationUpdate(position);
                                 lastManualUpdate = Date.now();
+                                lastSentTime = Date.now();
                                 consecutiveFailures = 0; // Reset failure counter
                                 console.log('Chrome polling location update sent');
                             },
@@ -1042,6 +1174,7 @@
                                             });
                                             sendLocationUpdate(position);
                                             lastManualUpdate = Date.now();
+                                            lastSentTime = Date.now();
                                             console.log('Low accuracy fallback succeeded');
                                         },
                                         function(error) {
@@ -1057,28 +1190,55 @@
                             },
                             {
                                 enableHighAccuracy: highAccuracy,
-                                timeout: 10000,  // Increased from 5000
-                                maximumAge: 30000 // Allow positions up to 30 seconds old
+                                timeout: 10000,
+                                maximumAge: 30000
                             }
                         );
-                    }, 10000); // Every 10 seconds instead of 5
+                    }, 30000); // Every 30 seconds for Chrome
+                } else if (isIOSSafari) {
+                    // For iOS Safari, use a reduced frequency because of iOS batching behavior
+                    console.log('Using iOS Safari-specific strategy with 10-second intervals');
+                    setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                throttledSendLocation(position);
+                            },
+                            function(error) {
+                                console.error('Error in iOS Safari polling:', error);
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 30000
+                            }
+                        );
+                    }, 10000); // Every 10 seconds for iOS Safari
+                } else {
+                    // For other browsers, use the standard 5-second interval
+                    console.log('Using default strategy with 5-second updates');
+                    setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                throttledSendLocation(position);
+                            },
+                            function(error) {
+                                console.error('Error in default browser polling:', error);
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 30000
+                            }
+                        );
+                    }, 5000); // Every 5 seconds for non-Chrome, non-iOS browsers
                 }
 
-                // Still use watchPosition as a backup
+                // Still use watchPosition but with throttling
                 watchId = navigator.geolocation.watchPosition(
                     function(position) {
-                        updateUserLocation({
-                            coords: {
-                                latitude: position.coords.latitude,
-                                longitude: position.coords.longitude,
-                                accuracy: position.coords.accuracy
-                            }
-                        });
-                        
-                        sendLocationUpdate(position);
-                        lastManualUpdate = Date.now();
+                        // Use throttled function to limit update frequency
+                        throttledSendLocation(position);
                         consecutiveFailures = 0; // Reset failure counter
-                        console.log('watchPosition update received and sent');
                     },
                     function(error) {
                         console.error('Error watching location:', error);
@@ -1091,16 +1251,18 @@
                     },
                     {
                         enableHighAccuracy: true,
-                        timeout: 27000,  // Increased significantly
+                        timeout: 27000,
                         maximumAge: 30000
                     }
                 );
                 
                 // Fallback using stored location for emergencies
+                // Set to 5 seconds for Safari, keep 60 seconds for Chrome
                 setInterval(() => {
-                    // If we haven't updated in 30 seconds and have failures, use the last known position
+                    const emergencyInterval = isChrome ? 60000 : 5000;
+                    // If we haven't updated in the interval and have failures, use the last known position
                     const now = Date.now();
-                    if (now - lastManualUpdate > 30000 && consecutiveFailures > 2) {
+                    if (now - lastManualUpdate > emergencyInterval && consecutiveFailures > 2) {
                         console.log('Using last known position due to failures');
                         // If we have a userMarker, we can use its position
                         if (userMarker) {
@@ -1115,11 +1277,12 @@
                                 };
                                 sendLocationUpdate(fakePosition);
                                 lastManualUpdate = now;
+                                lastSentTime = now;
                                 console.log('Sent last known position as fallback');
                             }
                         }
                     }
-                }, 30000); // Check every 30 seconds
+                }, 5000); // Check every 5 seconds for Safari/others, but logic inside handles different intervals
             }
         }
 
