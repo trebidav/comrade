@@ -30,6 +30,37 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         if hasattr(self, 'location_group'):
+            # Get user's friends and sharing level before sending offline notification
+            friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+            
+            # Prepare offline notification
+            offline_message = {
+                'type': 'user_offline',
+                'userId': self.user.id
+            }
+
+            # Send offline notification to all friends
+            for friend in friends:
+                friend_location_group = f"location_{friend.id}"
+                await self.channel_layer.group_send(
+                    friend_location_group,
+                    offline_message
+                )
+
+            # If sharing was set to ALL, also notify all non-friends
+            if self.user.location_sharing_level == User.SharingLevel.ALL:
+                all_users = await database_sync_to_async(
+                    lambda: list(User.objects.exclude(id=self.user.id).exclude(id__in=[f.id for f in friends]))
+                )()
+                
+                for user in all_users:
+                    user_location_group = f"location_{user.id}"
+                    await self.channel_layer.group_send(
+                        user_location_group,
+                        offline_message
+                    )
+
+            # Finally, leave the group
             await self.channel_layer.group_discard(
                 self.location_group,
                 self.channel_name
@@ -41,6 +72,13 @@ class LocationConsumer(AsyncWebsocketConsumer):
         # Handle preference updates
         if 'preferences' in data:
             await self.update_preferences(data['preferences'])
+            return
+            
+        # Handle heartbeat
+        if data.get('type') == 'heartbeat':
+            await self.send(text_data=json.dumps({
+                'type': 'heartbeat_response'
+            }))
             return
 
         # Handle location updates
@@ -54,6 +92,10 @@ class LocationConsumer(AsyncWebsocketConsumer):
             skills = await database_sync_to_async(
                 lambda: list(self.user.skills.values_list('name', flat=True))
             )()
+
+            # Save location regardless of sharing preferences
+            await self.save_user_location(self.user, latitude, longitude)
+            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude}")
 
             # Only proceed with sharing if not set to NONE
             if self.user.location_sharing_level != User.SharingLevel.NONE:
@@ -70,15 +112,18 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     'skills': skills
                 }
 
-                # Send detailed update to all friends
+                # Send detailed update to all friends - assume they're all active
+                friend_count = len(friends)
                 for friend in friends:
                     friend_location_group = f"location_{friend.id}"
                     await self.channel_layer.group_send(
                         friend_location_group,
                         friend_update
                     )
+                
+                print(f"[{timezone.now()}] Broadcasting location to {friend_count} friends for {self.user.username}")
 
-                # If sharing level is ALL, also send basic info to non-friends
+                # If sharing level is ALL, send basic info to all non-friend users
                 if self.user.location_sharing_level == User.SharingLevel.ALL:
                     # For public users, send location without detailed info
                     public_update = {
@@ -91,23 +136,22 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         'timestamp': timezone.now().isoformat()
                     }
 
-                    # Get all non-friend users
-                    active_users = await database_sync_to_async(
+                    # Get ALL users except self and friends
+                    all_users = await database_sync_to_async(
                         lambda: list(User.objects.exclude(id=self.user.id).exclude(id__in=[f.id for f in friends]))
                     )()
                     
-                    # Send to all non-friend users
-                    for user in active_users:
+                    # Send to all non-friend users - assume they're all active
+                    public_count = len(all_users)
+                    for user in all_users:
                         user_location_group = f"location_{user.id}"
                         await self.channel_layer.group_send(
                             user_location_group,
                             public_update
                         )
-            
-            # Save location regardless of sharing preferences
-            await self.save_user_location(self.user, latitude, longitude)
-            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude}")
-
+                    
+                    print(f"[{timezone.now()}] Broadcasting location to {public_count} public users for {self.user.username}")
+                    
     async def update_preferences(self, preferences_data):
         """Update user's location sharing preferences"""
         sharing_level = preferences_data.get('sharing_level')
@@ -160,6 +204,13 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'skills': event['skills']
         }))
 
+    async def user_offline(self, event):
+        """Handler for user offline notifications"""
+        await self.send(text_data=json.dumps({
+            'type': 'user_offline',
+            'userId': event['userId']
+        }))
+
     async def location_update(self, event):
         # Send location update with user identification
         await self.send(text_data=json.dumps({
@@ -176,6 +227,14 @@ class LocationConsumer(AsyncWebsocketConsumer):
         user.longitude = longitude
         user.timestamp = timezone.now()
         await database_sync_to_async(user.save)()
+
+    async def group_exists(self, group_name):
+        """Check if a channel group has any members"""
+        try:
+            group_channels = await self.channel_layer.group_channels(group_name)
+            return len(group_channels) > 0
+        except (AttributeError, KeyError):
+            return False
 
     @database_sync_to_async
     def get_user_from_token(self):

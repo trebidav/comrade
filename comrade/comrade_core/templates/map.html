@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map - Comrade</title>
@@ -221,6 +221,228 @@
         let accuracyCircle;
         let friendsMarkers = {};
         let publicMarkers = {};
+        let ws;
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 10;
+        let reconnectTimeout;
+
+        // Variables to track location watching
+        let watchId = null;
+        let lastManualUpdate = 0;
+        let heartbeatInterval = null;
+
+        function getReconnectDelay() {
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, etc. up to 60s max
+            return Math.min(1000 * Math.pow(2, reconnectAttempts), 60000);
+        }
+
+        function clearMarkersAndConnection() {
+            // Stop heartbeat
+            stopHeartbeat();
+            
+            // Stop watching location
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Clear all markers
+            Object.values(friendsMarkers).forEach(marker => {
+                marker.setMap(null);
+            });
+            friendsMarkers = {};
+
+            Object.values(publicMarkers).forEach(marker => {
+                marker.setMap(null);
+            });
+            publicMarkers = {};
+
+            // Clear any pending reconnection
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
+
+            // Close WebSocket if it's open
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        }
+
+        function initWebSocket() {
+            clearMarkersAndConnection();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/location/?token=${apiToken}`);
+
+            ws.onopen = function() {
+                console.log('WebSocket connection established');
+                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+                
+                // Start heartbeat to keep connection alive
+                startHeartbeat();
+                
+                // Start sending location updates
+                startLocationUpdates();
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received WebSocket message:', data);  // Debug log
+                
+                if (data.type === 'location_update') {
+                    updateUserLocation({
+                        coords: {
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            accuracy: data.accuracy || 50
+                        }
+                    });
+                } else if (data.type === 'friend_location') {
+                    updateFriendLocation(data);
+                } else if (data.type === 'public_location') {
+                    updatePublicLocation(data);
+                } else if (data.type === 'friend_details') {
+                    // Update local user info if it's about us
+                    if (data.userId === userInfo.id) {
+                        userInfo.friends = data.friends;
+                        userInfo.skills = data.skills;
+                        localStorage.setItem('user_info', JSON.stringify(userInfo));
+                        
+                        // Update the user's info window content
+                        if (userMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            userMarker.addListener('click', () => {
+                                infoWindow.open(map, userMarker);
+                            });
+                        }
+                    } else {
+                        // Update friend marker info if it exists
+                        const friendMarker = friendsMarkers[data.userId];
+                        if (friendMarker) {
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div style="padding: 8px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #333;">${data.name}</h3>
+                                        <div style="margin-bottom: 8px;">
+                                            <strong style="color: #666;">Friends (${data.friends?.length || 0}):</strong>
+                                            <p style="margin: 4px 0; color: #666;">
+                                                ${data.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <strong style="color: #666;">Skills:</strong>
+                                            <p style="margin: 4px 0; color: #666;">${data.skills?.join(', ') || 'No skills listed'}</p>
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            friendMarker.addListener('click', () => {
+                                infoWindow.open(map, friendMarker);
+                            });
+                        }
+                    }
+                } else if (data.type === 'user_offline') {
+                    console.log('User went offline:', data.userId);  // Debug log
+                    // Remove the user's marker based on their relationship
+                    const friendMarker = friendsMarkers[data.userId];
+                    const publicMarker = publicMarkers[data.userId];
+                    
+                    if (friendMarker) {
+                        friendMarker.setMap(null);
+                        delete friendsMarkers[data.userId];
+                    }
+                    
+                    if (publicMarker) {
+                        publicMarker.setMap(null);
+                        delete publicMarkers[data.userId];
+                    }
+                } else if (data.type === 'heartbeat_response') {
+                    console.log('Heartbeat response received');
+                }
+            };
+
+            return ws;
+        }
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 50.0755, lng: 14.4378 }, // Prague
+                zoom: 13,
+            });
+
+            // Initialize WebSocket connection
+            ws = initWebSocket();
+        }
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden (inactive), clear everything
+                console.log('Page hidden, clearing connections and markers');
+                clearMarkersAndConnection();
+                reconnectAttempts = 0; // Reset attempts for when we come back
+            } else {
+                // Page is visible again, reinitialize connection
+                console.log('Page visible, reconnecting...');
+                initWebSocket();
+                
+                // Force an immediate location update
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            console.log('Sending immediate location update after page became visible');
+                            const location = {
+                                type: 'location_update',
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                userId: userInfo.id,
+                                name: userInfo.name
+                            };
+                            
+                            // Wait a short time to ensure WebSocket is connected
+                            setTimeout(() => {
+                                if (ws && ws.readyState === WebSocket.OPEN) {
+                                    console.log('Immediate location update sent after visibility change');
+                                    ws.send(JSON.stringify(location));
+                                } else {
+                                    console.log('WebSocket not ready, cannot send immediate update', ws ? ws.readyState : 'no websocket');
+                                }
+                            }, 1000);
+                        },
+                        function(error) {
+                            console.error('Error getting immediate location:', error);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+            }
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            clearMarkersAndConnection();
+        });
 
         // Friend requests modal functions
         function openFriendRequestsModal() {
@@ -337,160 +559,6 @@
         // Initial check for pending requests
         fetchPendingRequests();
 
-        function initMap() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 50.0755, lng: 14.4378 }, // Prague
-                zoom: 13,
-            });
-
-            // Initialize WebSocket connection
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/location/?token=${apiToken}`);
-
-            ws.onopen = function() {
-                console.log('WebSocket connection established');
-                // Start sending location updates
-                if (navigator.geolocation) {
-                    // First, get initial position
-                    navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            updateUserLocation({
-                                coords: {
-                                    latitude: position.coords.latitude,
-                                    longitude: position.coords.longitude,
-                                    accuracy: position.coords.accuracy
-                                }
-                            });
-                        },
-                        function(error) {
-                            console.error('Error getting initial location:', error);
-                        },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 5000,
-                            maximumAge: 0
-                        }
-                    );
-
-                    // Then, watch for position changes
-                    navigator.geolocation.watchPosition(
-                        function(position) {
-                            updateUserLocation({
-                                coords: {
-                                    latitude: position.coords.latitude,
-                                    longitude: position.coords.longitude,
-                                    accuracy: position.coords.accuracy
-                                }
-                            });
-                            
-                            // Send location to server
-                            const location = {
-                                type: 'location_update',
-                                latitude: position.coords.latitude,
-                                longitude: position.coords.longitude,
-                                accuracy: position.coords.accuracy,
-                                userId: userInfo.id,
-                                name: userInfo.name
-                            };
-                            
-                            if (ws.readyState === WebSocket.OPEN) {
-                                ws.send(JSON.stringify(location));
-                            }
-                        },
-                        function(error) {
-                            console.error('Error watching location:', error);
-                        },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 5000,
-                            maximumAge: 0
-                        }
-                    );
-                }
-            };
-
-            ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                if (data.type === 'location_update') {
-                    updateUserLocation({
-                        coords: {
-                            latitude: data.latitude,
-                            longitude: data.longitude,
-                            accuracy: data.accuracy || 50
-                        }
-                    });
-                } else if (data.type === 'friend_location') {
-                    updateFriendLocation(data);
-                } else if (data.type === 'public_location') {
-                    updatePublicLocation(data);
-                } else if (data.type === 'friend_details') {
-                    // Update local user info if it's about us
-                    if (data.userId === userInfo.id) {
-                        userInfo.friends = data.friends;
-                        userInfo.skills = data.skills;
-                        localStorage.setItem('user_info', JSON.stringify(userInfo));
-                        
-                        // Update the user's info window content
-                        if (userMarker) {
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="padding: 8px;">
-                                        <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
-                                        <div style="margin-bottom: 8px;">
-                                            <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
-                                            <p style="margin: 4px 0; color: #666;">
-                                                ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <strong style="color: #666;">Skills:</strong>
-                                            <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            userMarker.addListener('click', () => {
-                                infoWindow.open(map, userMarker);
-                            });
-                        }
-                    } else {
-                        // Update friend marker info if it exists
-                        const friendMarker = friendsMarkers[data.userId];
-                        if (friendMarker) {
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="padding: 8px;">
-                                        <h3 style="margin: 0 0 8px 0; color: #333;">${data.name}</h3>
-                                        <div style="margin-bottom: 8px;">
-                                            <strong style="color: #666;">Friends (${data.friends?.length || 0}):</strong>
-                                            <p style="margin: 4px 0; color: #666;">
-                                                ${data.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <strong style="color: #666;">Skills:</strong>
-                                            <p style="margin: 4px 0; color: #666;">${data.skills?.join(', ') || 'No skills listed'}</p>
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            friendMarker.addListener('click', () => {
-                                infoWindow.open(map, friendMarker);
-                            });
-                        }
-                    }
-                }
-            };
-
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-            };
-
-            ws.onclose = function() {
-                console.log('WebSocket connection closed');
-            };
-        }
-
         function updateUserLocation(position) {
             const lat = position.coords ? position.coords.latitude : position.latitude;
             const lng = position.coords ? position.coords.longitude : position.longitude;
@@ -500,7 +568,7 @@
             if (!userMarker) {
                 userMarker = new google.maps.Marker({
                     position: { lat, lng },
-                    map: map,
+                            map: map,
                     title: 'Your Location',
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
@@ -543,7 +611,7 @@
                 // Hide info window on mouseout (only if not locked)
                 userMarker.addListener('mouseout', () => {
                     if (!isInfoWindowLocked) {
-                        infoWindow.close();
+                            infoWindow.close();
                     }
                 });
 
@@ -593,7 +661,7 @@
             if (!friendsMarkers[userId]) {
                 const marker = new google.maps.Marker({
                     position: { lat: latitude, lng: longitude },
-                    map: map,
+                map: map,
                     title: name,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
@@ -638,7 +706,7 @@
                 // Hide info window on mouseout (only if not locked)
                 marker.addListener('mouseout', () => {
                     if (!isInfoWindowLocked) {
-                        infoWindow.close();
+                infoWindow.close();
                     }
                 });
 
@@ -671,7 +739,7 @@
             if (!publicMarkers[userId]) {
                 const marker = new google.maps.Marker({
                     position: { lat: latitude, lng: longitude },
-                    map: map,
+                                map: map,
                     title: name,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
@@ -720,7 +788,7 @@
                 // Hide info window on mouseout (only if not locked)
                 marker.addListener('mouseout', () => {
                     if (!isInfoWindowLocked) {
-                        infoWindow.close();
+                                infoWindow.close();
                     }
                 });
 
@@ -804,8 +872,259 @@
             return cookieValue;
         }
 
+        function startHeartbeat() {
+            // Clear any existing heartbeat
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+            
+            // Send heartbeat every 10 seconds (reduced from 15)
+            heartbeatInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    console.log('Sending heartbeat');
+                    ws.send(JSON.stringify({ type: 'heartbeat' }));
+                    
+                    // Force a location update with the heartbeat
+                    forceLocationUpdate();
+                }
+            }, 10000);
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+
+        function forceLocationUpdate() {
+            // Only force update if the last update was more than 10 seconds ago
+            const now = Date.now();
+            if (now - lastManualUpdate > 10000) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        sendLocationUpdate(position);
+                        lastManualUpdate = now;
+                    },
+                    function(error) {
+                        console.error('Error getting forced location update:', error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            }
+        }
+
+        function sendLocationUpdate(position) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const location = {
+                    type: 'location_update',
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    userId: userInfo.id,
+                    name: userInfo.name
+                };
+                
+                console.log('Sending location update:', location);
+                ws.send(JSON.stringify(location));
+            } else {
+                console.warn('WebSocket not open, cannot send location update');
+            }
+        }
+
+        function startLocationUpdates() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Track consecutive failures to adjust settings
+            let consecutiveFailures = 0;
+            let useHighAccuracy = true;
+            
+            if (navigator.geolocation) {
+                // First, get initial position with increased timeout
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        updateUserLocation({
+                            coords: {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            }
+                        });
+                        
+                        // Send initial location
+                        sendLocationUpdate(position);
+                        lastManualUpdate = Date.now();
+                        consecutiveFailures = 0; // Reset failure counter on success
+                    },
+                    function(error) {
+                        console.error('Error getting initial location:', error);
+                        consecutiveFailures++;
+                        // Try again with lower accuracy if we had a timeout
+                        if (error.code === 3 && useHighAccuracy) {
+                            useHighAccuracy = false;
+                            console.log('Switching to low accuracy mode due to timeout');
+                            navigator.geolocation.getCurrentPosition(
+                                function(position) {
+                                    updateUserLocation({
+                                        coords: {
+                                            latitude: position.coords.latitude,
+                                            longitude: position.coords.longitude,
+                                            accuracy: position.coords.accuracy
+                                        }
+                                    });
+                                    sendLocationUpdate(position);
+                                    lastManualUpdate = Date.now();
+                                },
+                                function(error) {
+                                    console.error('Still failed with low accuracy:', error);
+                                },
+                                {
+                                    enableHighAccuracy: false,
+                                    timeout: 15000,  // Even longer timeout for low accuracy
+                                    maximumAge: 60000 // Allow cached positions up to 1 minute
+                                }
+                            );
+                        }
+                    },
+                    {
+                        enableHighAccuracy: useHighAccuracy,
+                        timeout: 10000,  // Increased from 5000 to 10000
+                        maximumAge: 30000 // Allow positions up to 30 seconds old
+                    }
+                );
+
+                // Detect Chrome browser
+                const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+                console.log('Browser detection - Chrome:', isChrome);
+
+                // For Chrome, rely more on polling than watchPosition
+                if (isChrome) {
+                    console.log('Using Chrome-specific location strategy');
+                    // Set up more frequent polling for Chrome (every 10 seconds instead of 5)
+                    setInterval(() => {
+                        // Adjust accuracy based on previous failures
+                        const highAccuracy = consecutiveFailures < 3;
+                        
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                updateUserLocation({
+                                    coords: {
+                                        latitude: position.coords.latitude,
+                                        longitude: position.coords.longitude,
+                                        accuracy: position.coords.accuracy
+                                    }
+                                });
+                                sendLocationUpdate(position);
+                                lastManualUpdate = Date.now();
+                                consecutiveFailures = 0; // Reset failure counter
+                                console.log('Chrome polling location update sent');
+                            },
+                            function(error) {
+                                console.error('Error in Chrome location polling:', error);
+                                consecutiveFailures++;
+                                // If we're getting timeouts, try again with lower accuracy
+                                if (error.code === 3 && highAccuracy) {
+                                    navigator.geolocation.getCurrentPosition(
+                                        function(position) {
+                                            updateUserLocation({
+                                                coords: {
+                                                    latitude: position.coords.latitude,
+                                                    longitude: position.coords.longitude,
+                                                    accuracy: position.coords.accuracy
+                                                }
+                                            });
+                                            sendLocationUpdate(position);
+                                            lastManualUpdate = Date.now();
+                                            console.log('Low accuracy fallback succeeded');
+                                        },
+                                        function(error) {
+                                            console.error('Even low accuracy failed:', error);
+                                        },
+                                        {
+                                            enableHighAccuracy: false,
+                                            timeout: 15000,
+                                            maximumAge: 60000
+                                        }
+                                    );
+                                }
+                            },
+                            {
+                                enableHighAccuracy: highAccuracy,
+                                timeout: 10000,  // Increased from 5000
+                                maximumAge: 30000 // Allow positions up to 30 seconds old
+                            }
+                        );
+                    }, 10000); // Every 10 seconds instead of 5
+                }
+
+                // Still use watchPosition as a backup
+                watchId = navigator.geolocation.watchPosition(
+                    function(position) {
+                        updateUserLocation({
+                            coords: {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            }
+                        });
+                        
+                        sendLocationUpdate(position);
+                        lastManualUpdate = Date.now();
+                        consecutiveFailures = 0; // Reset failure counter
+                        console.log('watchPosition update received and sent');
+                    },
+                    function(error) {
+                        console.error('Error watching location:', error);
+                        consecutiveFailures++;
+                        
+                        // If watching fails, ensure heartbeat is running
+                        if (!heartbeatInterval) {
+                            startHeartbeat();
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 27000,  // Increased significantly
+                        maximumAge: 30000
+                    }
+                );
+                
+                // Fallback using stored location for emergencies
+                setInterval(() => {
+                    // If we haven't updated in 30 seconds and have failures, use the last known position
+                    const now = Date.now();
+                    if (now - lastManualUpdate > 30000 && consecutiveFailures > 2) {
+                        console.log('Using last known position due to failures');
+                        // If we have a userMarker, we can use its position
+                        if (userMarker) {
+                            const position = userMarker.getPosition();
+                            if (position) {
+                                const fakePosition = {
+                                    coords: {
+                                        latitude: position.lat(),
+                                        longitude: position.lng(),
+                                        accuracy: 100 // Default accuracy
+                                    }
+                                };
+                                sendLocationUpdate(fakePosition);
+                                lastManualUpdate = now;
+                                console.log('Sent last known position as fallback');
+                            }
+                        }
+                    }
+                }, 30000); // Check every 30 seconds
+            }
+        }
+
         // Initial WebSocket connection
         initMap();
     </script>
-</body>
+  </body>
 </html>
