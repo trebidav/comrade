@@ -81,6 +81,27 @@ class LocationConsumer(AsyncWebsocketConsumer):
             }))
             return
 
+        # Handle chat messages
+        if data.get('type') == 'chat_message':
+            message = data.get('message')
+            sender = data.get('sender')
+            
+            # Get user's friends
+            friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+            
+            # Send message to all friends
+            for friend in friends:
+                friend_location_group = f"location_{friend.id}"
+                await self.channel_layer.group_send(
+                    friend_location_group,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'sender': sender
+                    }
+                )
+            return
+
         # Handle location updates
         if data.get('type') == 'location_update':
             latitude = data['latitude']
@@ -244,6 +265,14 @@ class LocationConsumer(AsyncWebsocketConsumer):
             return token.user
         except Token.DoesNotExist:
             return AnonymousUser()
+
+    async def chat_message(self, event):
+        """Handler for chat messages"""
+        await self.send(text_data=json.dumps({
+            'type': 'chat_message',
+            'message': event['message'],
+            'sender': event['sender']
+        }))
 
 from urllib.parse import parse_qs
 from asgiref.sync import sync_to_async

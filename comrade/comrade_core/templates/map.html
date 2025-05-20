@@ -64,6 +64,86 @@
         .legend-text {
             color: #666;
         }
+        /* Chat window styles */
+        .chat-window {
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+            width: 300px;
+            height: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            padding: 15px;
+            background: #4285F4;
+            color: white;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            padding: 8px 12px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .message.sent {
+            background: #4285F4;
+            color: white;
+            align-self: flex-end;
+        }
+        .message.received {
+            background: #E8E8E8;
+            color: #333;
+            align-self: flex-start;
+        }
+        .chat-input {
+            padding: 15px;
+            border-top: 1px solid #E8E8E8;
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #E8E8E8;
+            border-radius: 20px;
+            outline: none;
+        }
+        .chat-input button {
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .chat-input button:hover {
+            background: #3367D6;
+        }
+        .minimize-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+        }
         /* Modal styles */
         .modal {
             display: none;
@@ -310,6 +390,21 @@
     </style>
 </head>
 <body>
+    <!-- Chat Window -->
+    <div class="chat-window" id="chatWindow">
+        <div class="chat-header">
+            <span>Chat</span>
+            <button class="minimize-button" onclick="toggleChat()">−</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will be inserted here -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
     <div id="map"></div>
     <div class="tasks-panel">
         <h3>My Tasks</h3>
@@ -486,62 +581,9 @@
                     updateFriendLocation(data);
                 } else if (data.type === 'public_location') {
                     updatePublicLocation(data);
-                } else if (data.type === 'friend_details') {
-                    // Update local user info if it's about us
-                    if (data.userId === userInfo.id) {
-                        userInfo.friends = data.friends;
-                        userInfo.skills = data.skills;
-                        localStorage.setItem('user_info', JSON.stringify(userInfo));
-                        
-                        // Update the user's info window content
-                        if (userMarker) {
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="padding: 8px;">
-                                        <h3 style="margin: 0 0 8px 0; color: #333;">${userInfo.name}</h3>
-                                        <div style="margin-bottom: 8px;">
-                                            <strong style="color: #666;">Friends (${userInfo.friends?.length || 0}):</strong>
-                                            <p style="margin: 4px 0; color: #666;">
-                                                ${userInfo.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <strong style="color: #666;">Skills:</strong>
-                                            <p style="margin: 4px 0; color: #666;">${userInfo.skills?.join(', ') || 'No skills listed'}</p>
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            userMarker.addListener('click', () => {
-                                infoWindow.open(map, userMarker);
-                            });
-                        }
-                    } else {
-                        // Update friend marker info if it exists
-                        const friendMarker = friendsMarkers[data.userId];
-                        if (friendMarker) {
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="padding: 8px;">
-                                        <h3 style="margin: 0 0 8px 0; color: #333;">${data.name}</h3>
-                                        <div style="margin-bottom: 8px;">
-                                            <strong style="color: #666;">Friends (${data.friends?.length || 0}):</strong>
-                                            <p style="margin: 4px 0; color: #666;">
-                                                ${data.friends?.map(friend => friend.name).join(', ') || 'No friends yet'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <strong style="color: #666;">Skills:</strong>
-                                            <p style="margin: 4px 0; color: #666;">${data.skills?.join(', ') || 'No skills listed'}</p>
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            friendMarker.addListener('click', () => {
-                                infoWindow.open(map, friendMarker);
-                            });
-                        }
-                    }
+                } else if (data.type === 'chat_message' && data.sender !== userInfo.name) {
+                    // Add received message to chat
+                    addMessageToChat(`${data.sender}: ${data.message}`, false);
                 } else if (data.type === 'user_offline') {
                     console.log('User went offline:', data.userId);  // Debug log
                     // Remove the user's marker based on their relationship
@@ -1989,6 +2031,63 @@
                 "
             >×</button>
         `);
+
+        // Chat functionality
+        let isChatMinimized = false;
+        const chatWindow = document.getElementById('chatWindow');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+
+        function toggleChat() {
+            isChatMinimized = !isChatMinimized;
+            if (isChatMinimized) {
+                chatWindow.style.height = '50px';
+                chatMessages.style.display = 'none';
+                document.querySelector('.chat-input').style.display = 'none';
+                document.querySelector('.minimize-button').textContent = '+';
+            } else {
+                chatWindow.style.height = '400px';
+                chatMessages.style.display = 'flex';
+                document.querySelector('.chat-input').style.display = 'flex';
+                document.querySelector('.minimize-button').textContent = '−';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                // Send message through WebSocket
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'chat_message',
+                        message: message,
+                        sender: userInfo.name
+                    }));
+                    
+                    // Add message to chat window
+                    addMessageToChat(message, true);
+                    
+                    // Clear input
+                    messageInput.value = '';
+                } else {
+                    console.error('WebSocket is not connected');
+                }
+            }
+        }
+
+        function addMessageToChat(message, isSent) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageElement.textContent = message;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
         // Initial WebSocket connection
         initMap();
