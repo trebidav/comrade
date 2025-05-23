@@ -30,11 +30,11 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    '934c-77-240-102-76.ngrok-free.app',
+    '0f79-77-240-102-76.ngrok-free.app',
 ]
 
 SITE_ID = 1
-SITE_URL = 'https://934c-77-240-102-76.ngrok-free.app'
+SITE_URL = 'https://0f79-77-240-102-76.ngrok-free.app'
 
 # Application definition
 
@@ -94,7 +94,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "https://accounts.google.com",
-    "https://934c-77-240-102-76.ngrok-free.app"
+    "https://0f79-77-240-102-76.ngrok-free.app"
 ]
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -164,7 +164,7 @@ LOCAL_IP = get_local_ip()
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'https://934c-77-240-102-76.ngrok-free.app',
+    'https://0f79-77-240-102-76.ngrok-free.app',
 ]
 
 LOGIN_URL = '/login/'
