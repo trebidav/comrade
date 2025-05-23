@@ -1,0 +1,39 @@
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('Received WebSocket message:', data);  // Debug log
+    
+    if (data.type === 'location_update') {
+        updateUserLocation({
+            coords: {
+                latitude: data.latitude,
+                longitude: data.longitude,
+                accuracy: data.accuracy || 50
+            }
+        });
+    } else if (data.type === 'friend_location') {
+        updateFriendLocation(data);
+    } else if (data.type === 'public_location') {
+        updatePublicLocation(data);
+    } else if (data.type === 'chat_message') {
+        // Add received message to chat
+        const messageText = data.sender === userInfo.name ? data.message : `${data.sender}: ${data.message}`;
+        addMessageToChat(messageText, data.sender === userInfo.name);
+    } else if (data.type === 'user_offline') {
+        console.log('User went offline:', data.userId);  // Debug log
+        // Remove the user's marker based on their relationship
+        const friendMarker = friendsMarkers[data.userId];
+        const publicMarker = publicMarkers[data.userId];
+        
+        if (friendMarker) {
+            friendMarker.setMap(null);
+            delete friendsMarkers[data.userId];
+        }
+        
+        if (publicMarker) {
+            publicMarker.setMap(null);
+            delete publicMarkers[data.userId];
+        }
+    } else if (data.type === 'heartbeat_response') {
+        console.log('Heartbeat response received');
+    }
+}; 
