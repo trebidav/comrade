@@ -304,7 +304,7 @@ class Task(models.Model):
         if self.state != Task.State.IN_PROGRESS:
             return False
 
-        if user != self.owner or user != self.assignee:
+        if user != self.owner and user != self.assignee:
             raise ValidationError("Only owner and assignee can finish the task")
 
         self.datetime_finish = now()

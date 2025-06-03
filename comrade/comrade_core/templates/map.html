@@ -2115,7 +2115,8 @@
                     'Authorization': `Token ${apiToken}`,
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
-                }
+                },
+                credentials: 'include'
             })
             .then(response => {
                 if (response.ok) {
@@ -2142,7 +2143,8 @@
                     'Authorization': `Token ${apiToken}`,
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
-                }
+                },
+                credentials: 'include'
             })
             .then(response => {
                 if (response.ok) {
@@ -2169,7 +2171,8 @@
                     'Authorization': `Token ${apiToken}`,
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
-                }
+                },
+                credentials: 'include'
             })
             .then(response => {
                 if (response.ok) {
@@ -2196,7 +2199,8 @@
                     'Authorization': `Token ${apiToken}`,
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
-                }
+                },
+                credentials: 'include'
             })
             .then(response => {
                 if (response.ok) {
@@ -2254,11 +2258,14 @@
             console.log('Tasks:', tasks);
             
             // Filter tasks that are assigned to the current user and in progress
-            const myTasks = tasks.filter(task => 
-                task.assignee && 
-                task.assignee === userId && 
-                (task.state === 2 || task.state === 3) // IN_PROGRESS or WAITING
-            );
+            const myTasks = tasks.filter(task => {
+                if (!task.assignee) return false;
+                
+                // Handle both cases: assignee as ID (number) or as object with id property
+                const assigneeId = typeof task.assignee === 'object' ? task.assignee.id : task.assignee;
+                
+                return assigneeId === userId && (task.state === 2 || task.state === 3); // IN_PROGRESS or WAITING
+            });
             
             console.log('Filtered tasks:', myTasks);
             
@@ -2275,21 +2282,95 @@
                 const stateText = task.state === 2 ? 'In Progress' : 'Waiting';
                 const stateColor = task.state === 2 ? '#34A853' : '#FBBC05';
                 
+                // Create action buttons based on task state
+                let actionButtons = '';
+                if (task.state === 2) { // IN_PROGRESS
+                    actionButtons = `
+                        <div style="margin-top: 10px; display: flex; gap: 5px; flex-direction: column;">
+                            <button 
+                                onclick="pauseTask(${task.id})"
+                                style="
+                                    background: var(--pip-green-dark);
+                                    color: var(--pip-text);
+                                    border: 1px solid var(--pip-green);
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-family: var(--pip-font);
+                                    text-transform: uppercase;
+                                    transition: all 0.3s ease;
+                                "
+                                onmouseover="this.style.background='var(--pip-green)'; this.style.color='var(--pip-bg)';"
+                                onmouseout="this.style.background='var(--pip-green-dark)'; this.style.color='var(--pip-text)';"
+                            >
+                                Pause Task
+                            </button>
+                            <button 
+                                onclick="finishTask(${task.id})"
+                                style="
+                                    background: var(--pip-green-dark);
+                                    color: var(--pip-text);
+                                    border: 1px solid var(--pip-green);
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-family: var(--pip-font);
+                                    text-transform: uppercase;
+                                    transition: all 0.3s ease;
+                                "
+                                onmouseover="this.style.background='var(--pip-green)'; this.style.color='var(--pip-bg)';"
+                                onmouseout="this.style.background='var(--pip-green-dark)'; this.style.color='var(--pip-text)';"
+                            >
+                                Finish Task
+                            </button>
+                        </div>
+                    `;
+                } else if (task.state === 3) { // WAITING
+                    actionButtons = `
+                        <div style="margin-top: 10px;">
+                            <button 
+                                onclick="resumeTask(${task.id})"
+                                style="
+                                    background: var(--pip-green-dark);
+                                    color: var(--pip-text);
+                                    border: 1px solid var(--pip-green);
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-family: var(--pip-font);
+                                    text-transform: uppercase;
+                                    transition: all 0.3s ease;
+                                    width: 100%;
+                                "
+                                onmouseover="this.style.background='var(--pip-green)'; this.style.color='var(--pip-bg)';"
+                                onmouseout="this.style.background='var(--pip-green-dark)'; this.style.color='var(--pip-text)';"
+                            >
+                                Resume Task
+                            </button>
+                        </div>
+                    `;
+                }
+                
                 const taskElement = document.createElement('div');
                 taskElement.className = 'task-item';
                 taskElement.innerHTML = `
                     <h4>${task.name}</h4>
                     <p>${task.description || 'No description'}</p>
                     <span class="task-status" style="background: ${stateColor}">${stateText}</span>
+                    ${actionButtons}
                 `;
                 
-                // Add click handler to center map on task
-                taskElement.onclick = () => {
-                    if (task.lat && task.lon) {
-                        map.setCenter({ lat: task.lat, lng: task.lon });
-                        map.setZoom(15);
-                    }
-                };
+                // Add click handler to center map on task (only for the task info, not buttons)
+                const taskInfo = taskElement.querySelector('h4, p');
+                if (taskInfo) {
+                    taskInfo.style.cursor = 'pointer';
+                    taskInfo.onclick = () => {
+                        if (task.lat && task.lon) {
+                            map.setCenter({ lat: task.lat, lng: task.lon });
+                            map.setZoom(15);
+                        }
+                    };
+                }
                 
                 myTasksList.appendChild(taskElement);
             });
