@@ -63,7 +63,7 @@
         }
 
         .logout-button:hover, .friend-requests-button:hover, .open-account-info:hover,
-        .accept-button:hover, .reject-button:hover, .chat-input button:hover {
+        .accept-button:hover, .reject-button:hover, .chat-input button:hover, #center-on-me-button:hover {
             background: var(--pip-green) !important;
             color: var(--pip-bg) !important;
             box-shadow: var(--pip-glow);
@@ -318,6 +318,21 @@
         .user-info p {
             margin: 5px 0;
             color: #666;
+        }
+        #center-on-me-button {
+            position: fixed;
+            bottom: 165px; /* Positioned above the legend */
+            right: 20px;
+            background: var(--pip-green-dark) !important;
+            color: var(--pip-text) !important;
+            border: 1px solid var(--pip-green) !important;
+            font-family: var(--pip-font);
+            text-transform: uppercase;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
         }
         .logout-button {
             background: #dc3545;
@@ -719,6 +734,7 @@
         <button class="open-account-info" onclick="openAccountInfo()">Account Settings</button>
         <button class="logout-button" onclick="window.location.href='{% url 'account_logout' %}?next=/login/'">Logout</button>
     </div>
+    <button id="center-on-me-button">Center on Me</button>
     <div class="legend">
         <div class="legend-item">
             <div class="legend-color" style="background: #4285F4;"></div>
@@ -2436,8 +2452,21 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        function centerOnUser() {
+            if (userMarker) {
+                map.setCenter(userMarker.getPosition());
+                map.setZoom(15);
+            }
+        }
+
+        function fetchFriendRequests() {
+            // ... existing code ...
+        }
+
         // Initial WebSocket connection
         initMap();
+
+        document.getElementById('center-on-me-button').addEventListener('click', centerOnUser);
     </script>
   </body>
 </html>
