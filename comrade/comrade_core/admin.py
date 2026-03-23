@@ -41,6 +41,9 @@ class ComradeUserAdmin(UserAdmin):
         ('Stats', {
             'fields': ('coins', 'xp', 'total_coins_earned', 'total_xp_earned', 'task_streak')
         }),
+        ('Welcome', {
+            'fields': ('welcome_accepted',)
+        }),
         ('Skills & Friends', {
             'fields': (
                 'skills', 'friends', 'friend_requests_sent'
@@ -98,6 +101,12 @@ class SkillAdmin(admin.ModelAdmin):
 class LocationConfigAdmin(admin.ModelAdmin):
     list_display = ['max_distance_km', 'task_proximity_km', 'coins_modifier', 'xp_modifier', 'time_modifier_minutes', 'criticality_percentage', 'pause_multiplier', 'level_modifier', 'last_updated']
     readonly_fields = ['last_updated']
+    fieldsets = (
+        ('Distance & Proximity', {'fields': ('max_distance_km', 'task_proximity_km')}),
+        ('Reward Modifiers', {'fields': ('coins_modifier', 'xp_modifier', 'time_modifier_minutes', 'criticality_percentage', 'pause_multiplier', 'level_modifier')}),
+        ('Welcome Message', {'fields': ('welcome_message',)}),
+        ('Meta', {'fields': ('last_updated',)}),
+    )
 
 
 class RatingAdmin(admin.ModelAdmin):

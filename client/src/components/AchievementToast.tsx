@@ -6,19 +6,20 @@ import { IconAchievement } from './Icons'
 interface Props {
   toasts: NewAchievement[]
   onDismiss: (id: number) => void
+  onTap?: () => void
 }
 
-export default function AchievementToasts({ toasts, onDismiss }: Props) {
+export default function AchievementToasts({ toasts, onDismiss, onTap }: Props) {
   return (
     <div className="toast-container">
       {toasts.map((t) => (
-        <AchievementToastItem key={t.id} achievement={t} onDismiss={onDismiss} />
+        <AchievementToastItem key={t.id} achievement={t} onDismiss={onDismiss} onTap={onTap} />
       ))}
     </div>
   )
 }
 
-function AchievementToastItem({ achievement, onDismiss }: { achievement: NewAchievement; onDismiss: (id: number) => void }) {
+function AchievementToastItem({ achievement, onDismiss, onTap }: { achievement: NewAchievement; onDismiss: (id: number) => void; onTap?: () => void }) {
   const [exiting, setExiting] = useState(false)
   const haptics = useHaptics()
 
@@ -35,6 +36,7 @@ function AchievementToastItem({ achievement, onDismiss }: { achievement: NewAchi
     if (exiting) return
     setExiting(true)
     setTimeout(() => onDismiss(achievement.id), 320)
+    if (onTap) onTap()
   }
 
   return (

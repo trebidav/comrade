@@ -183,6 +183,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [criticalityPercentage, setCriticalityPercentage] = useState(0.25)
   const [pauseMultiplier, setPauseMultiplier] = useState(1.0)
   const [achievementToasts, setAchievementToasts] = useState<NewAchievement[]>([])
+  const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
 
   // Apply persisted theme on mount and listen for changes
@@ -563,6 +564,7 @@ export default function MapView({ user, onLogout }: Props) {
           <AchievementToasts
             toasts={achievementToasts}
             onDismiss={(id) => setAchievementToasts((prev) => prev.filter((t) => t.id !== id))}
+            onTap={() => setShowAchievementsPanel(true)}
           />
 
           {/* User info panel - top right */}

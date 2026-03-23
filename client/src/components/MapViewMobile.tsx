@@ -227,6 +227,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [criticalityPercentage, setCriticalityPercentage] = useState(0.25)
   const [pauseMultiplier, setPauseMultiplier] = useState(1.0)
   const [achievementToasts, setAchievementToasts] = useState<NewAchievement[]>([])
+  const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
   const [activeSheet, setActiveSheet] = useState<MainSheet>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -528,6 +529,7 @@ export default function MapView({ user, onLogout }: Props) {
       <AchievementToasts
         toasts={achievementToasts}
         onDismiss={(id) => setAchievementToasts((prev) => prev.filter((t) => t.id !== id))}
+        onTap={() => setShowAchievementsPanel(true)}
       />
 
       {/* Profile button — top right corner */}
@@ -677,7 +679,7 @@ export default function MapView({ user, onLogout }: Props) {
         title="Profile"
         height="full"
       >
-        <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} />
+        <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} openAchievements={showAchievementsPanel} onAchievementsClosed={() => setShowAchievementsPanel(false)} />
       </BottomSheet>
 
       {/* Task detail sheet (tapping marker on map) */}

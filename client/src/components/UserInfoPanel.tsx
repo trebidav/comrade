@@ -13,12 +13,18 @@ interface Props {
   onlineFriendIds: Set<number>
   friendEvents: FriendEvent[]
   clearFriendEvents: () => void
+  openAchievements?: boolean
+  onAchievementsClosed?: () => void
 }
 
-export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents }: Props) {
+export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents, openAchievements, onAchievementsClosed }: Props) {
   const [showFriendRequests, setShowFriendRequests] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
+
+  useEffect(() => {
+    if (openAchievements) setShowAchievements(true)
+  }, [openAchievements])
   const [friendRequestCount, setFriendRequestCount] = useState(0)
   const haptics = useHaptics()
 
@@ -204,7 +210,7 @@ export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendE
       />
       <AchievementsPanel
         open={showAchievements}
-        onClose={() => setShowAchievements(false)}
+        onClose={() => { setShowAchievements(false); onAchievementsClosed?.() }}
       />
     </>
   )

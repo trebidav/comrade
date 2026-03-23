@@ -43,6 +43,21 @@ class LocationConfig(models.Model):
         default=1.0,
         help_text="Multiplier for level XP requirements (base 1000 XP per level, +10% per level)"
     )
+    welcome_message = models.TextField(
+        blank=True,
+        default=(
+            "Welcome to Comrade!\n\n"
+            "Here's how to get started:\n\n"
+            "1. Complete tutorials on the map to gain new skills\n"
+            "2. Skills unlock tasks — the more skills you have, the more tasks you can pick up\n"
+            "3. Walk to a task location, start it, and follow the instructions to complete it\n"
+            "4. After finishing a task, the task owner reviews your work\n"
+            "5. Once approved, you earn Coins and XP as a reward\n"
+            "6. Keep completing tasks to build streaks and unlock achievements\n\n"
+            "The more skills you earn, the more opportunities open up. Good luck, Comrade!"
+        ),
+        help_text="Welcome message shown to users after login. Supports plain text with newlines."
+    )
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -96,6 +111,8 @@ class User(AbstractUser):
         symmetrical=False
     )
     location_preferences_updated = models.DateTimeField(auto_now=True)
+
+    welcome_accepted = models.BooleanField(default=False, help_text="Whether the user has accepted the welcome message")
 
     # Friends management
     friends = models.ManyToManyField(

@@ -11,12 +11,18 @@ interface Props {
   onlineFriendIds: Set<number>
   friendEvents: FriendEvent[]
   clearFriendEvents: () => void
+  openAchievements?: boolean
+  onAchievementsClosed?: () => void
 }
 
-export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents }: Props) {
+export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents, openAchievements, onAchievementsClosed }: Props) {
   const [showFriendRequests, setShowFriendRequests] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
+
+  useEffect(() => {
+    if (openAchievements) setShowAchievements(true)
+  }, [openAchievements])
   const [friendRequestCount, setFriendRequestCount] = useState(0)
 
   const lp = user.level_progress ?? { level: user.level ?? 0, current_xp: 0, required_xp: 1000 }
@@ -181,7 +187,7 @@ export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendE
         clearFriendEvents={clearFriendEvents}
       />
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
-      <AchievementsPanel open={showAchievements} onClose={() => setShowAchievements(false)} />
+      <AchievementsPanel open={showAchievements} onClose={() => { setShowAchievements(false); onAchievementsClosed?.() }} />
     </>
   )
 }
