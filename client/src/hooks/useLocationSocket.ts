@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import api from '../api'
 
 export interface FriendLocation {
   userId: number
@@ -84,6 +85,22 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [publicUsers, setPublicUsers] = useState<Map<number, PublicLocation>>(new Map())
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
+  const chatHistoryLoaded = useRef(false)
+
+  // Load chat history on first mount
+  useEffect(() => {
+    if (chatHistoryLoaded.current || !token) return
+    chatHistoryLoaded.current = true
+    api.get('/chat/history/').then((res) => {
+      const msgs: ChatMessage[] = (res.data.messages ?? []).map((m: { id: number; text: string; sender: string }) => ({
+        id: m.id,
+        text: m.text,
+        sender: m.sender,
+        isSelf: m.sender === username,
+      }))
+      setChatMessages(msgs)
+    }).catch(() => {})
+  }, [token, username])
 
   // New real-time state
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdateEvent[]>([])
@@ -120,9 +137,10 @@ export function useLocationSocket({ token, username, userId }: Props) {
             sender: username,
           })
         )
+        // Use negative temp ID — will be replaced by server msg_id
         setChatMessages((prev) => [
           ...prev,
-          { id: ++msgIdRef.current, text: message, sender: username, isSelf: true },
+          { id: -(++msgIdRef.current), text: message, sender: username, isSelf: true },
         ])
       }
     },
@@ -263,11 +281,21 @@ export function useLocationSocket({ token, username, userId }: Props) {
 
           case 'chat_message': {
             const sender = data.sender ?? 'Unknown'
+            const id = data.msg_id ?? ++msgIdRef.current
             if (sender !== username) {
               setChatMessages((prev) => [
                 ...prev,
-                { id: ++msgIdRef.current, text: data.message, sender, isSelf: false },
+                { id, text: data.message, sender, isSelf: false },
               ])
+            } else if (data.msg_id) {
+              // Replace the optimistic message with the server-confirmed one
+              setChatMessages((prev) => {
+                const last = prev[prev.length - 1]
+                if (last?.isSelf && last.text === data.message && last.id < 0) {
+                  return [...prev.slice(0, -1), { ...last, id: data.msg_id }]
+                }
+                return prev
+              })
             }
             break
           }

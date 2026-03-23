@@ -5,7 +5,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
-from .models import User
+from .models import User, ChatMessage
 
 class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -95,10 +95,17 @@ class LocationConsumer(AsyncWebsocketConsumer):
         if data.get('type') == 'chat_message':
             message = data.get('message')
             sender = data.get('sender')
-            
+
+            # Persist to database
+            msg = await database_sync_to_async(ChatMessage.objects.create)(
+                sender=self.user, text=message
+            )
+            msg_id = msg.id
+            timestamp = msg.created_at.isoformat()
+
             # Get user's friends
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
-            
+
             # Send message to all friends
             for friend in friends:
                 friend_location_group = f"location_{friend.id}"
@@ -107,7 +114,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     {
                         'type': 'chat_message',
                         'message': message,
-                        'sender': sender
+                        'sender': sender,
+                        'msg_id': msg_id,
+                        'timestamp': timestamp,
                     }
                 )
             return
@@ -281,7 +290,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': event['message'],
-            'sender': event['sender']
+            'sender': event['sender'],
+            'msg_id': event.get('msg_id'),
+            'timestamp': event.get('timestamp'),
         }))
 
     # ── Real-time event handlers (forwarded from ws_events.py) ──

@@ -36,6 +36,7 @@ urlpatterns = [
     path('friends/sent/', views.get_sent_requests, name='get_sent_requests'),
     path('location/preferences/', views.LocationSharingPreferencesView.as_view(), name='location_preferences'),
     path('user/token/', views.token_login_view, name='token_login'),
+    path('chat/history/', views.chat_history, name='chat_history'),
 ]
 
 websocket_urlpatterns = [

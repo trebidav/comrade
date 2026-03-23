@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 
-from .models import Skill, Task, User, LocationConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement
+from .models import Skill, Task, User, LocationConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage
 
 
 class UserChangeForm(UserChangeForm):
@@ -201,6 +201,13 @@ class UserAchievementAdmin(admin.ModelAdmin):
     readonly_fields = ['datetime_earned']
 
 
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ['sender', 'text', 'created_at']
+    list_filter = ['sender']
+    search_fields = ['text', 'sender__username']
+    readonly_fields = ['created_at']
+
+
 admin.site.register(User, ComradeUserAdmin)
 admin.site.register(Task, TaskAdmin)
 admin.site.register(Skill, SkillAdmin)
@@ -213,3 +220,4 @@ admin.site.register(TutorialQuestion, TutorialQuestionAdmin)
 admin.site.register(TutorialProgress, TutorialProgressAdmin)
 admin.site.register(Achievement, AchievementAdmin)
 admin.site.register(UserAchievement, UserAchievementAdmin)
+admin.site.register(ChatMessage, ChatMessageAdmin)

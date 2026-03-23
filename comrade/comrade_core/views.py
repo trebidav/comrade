@@ -1,7 +1,7 @@
 import datetime
 import urllib.parse
 import urllib.request
-from comrade_core.models import Task
+from comrade_core.models import Task, ChatMessage
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
@@ -482,6 +482,22 @@ def get_pending_requests(request):
     pending_requests = request.user.get_pending_friend_requests()
     serializer = UserDetailSerializer(pending_requests, many=True)
     return Response({'pending_requests': serializer.data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def chat_history(request):
+    """Return the last 100 chat messages (global friends chat)."""
+    messages = ChatMessage.objects.select_related('sender').order_by('-created_at')[:100]
+    data = [
+        {
+            'id': m.id,
+            'text': m.text,
+            'sender': m.sender.username,
+            'timestamp': m.created_at.isoformat(),
+        }
+        for m in reversed(messages)
+    ]
+    return Response({'messages': data}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
