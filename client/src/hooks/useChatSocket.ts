@@ -19,7 +19,8 @@ export function useChatSocket({ token, room = 'general' }: Props) {
   useEffect(() => {
     if (!token) return
 
-    const ws = new WebSocket(`ws://${window.location.host}/ws/chat/${room}/?token=${token}`)
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${room}/?token=${token}`)
     socketRef.current = ws
 
     ws.onopen = () => setConnected(true)
