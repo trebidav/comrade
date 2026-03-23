@@ -1,4 +1,15 @@
 export type Theme = 'pipboy' | 'desert'
+export type LayoutMode = 'mobile' | 'desktop'
+
+export function getLayoutMode(): LayoutMode {
+  return (localStorage.getItem('comrade_layout') as LayoutMode) || 'mobile'
+}
+
+export function applyLayoutMode(mode: LayoutMode) {
+  document.documentElement.setAttribute('data-layout', mode)
+  localStorage.setItem('comrade_layout', mode)
+  window.dispatchEvent(new CustomEvent('comrade-layout-change'))
+}
 
 export function getTheme(): Theme {
   return (localStorage.getItem('comrade_theme') as Theme) || 'pipboy'

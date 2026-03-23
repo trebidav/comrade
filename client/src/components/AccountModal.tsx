@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api, { type User } from '../api'
-import { type Theme, getTheme, applyTheme } from '../theme'
+import { type Theme, getTheme, applyTheme, type LayoutMode, getLayoutMode, applyLayoutMode } from '../theme'
 import BottomSheet from './BottomSheet'
 
 interface LocationPreferences {
@@ -36,6 +36,7 @@ interface Props {
 
 export default function AccountModal({ open, onClose }: Props) {
   const [currentTheme, setCurrentTheme] = useState<Theme>(getTheme)
+  const [currentLayout, setCurrentLayout] = useState<LayoutMode>(getLayoutMode)
   const [prefs, setPrefs] = useState<LocationPreferences | null>(null)
   const [userData, setUserData] = useState<User | null>(null)
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig | null>(null)
@@ -143,6 +144,48 @@ export default function AccountModal({ open, onClose }: Props) {
                 </div>
               </div>
             )}
+
+            {/* Layout */}
+            <div style={{ marginBottom: '24px' }}>
+              <div className="section-label">Layout</div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {([
+                  { id: 'mobile' as LayoutMode, label: 'Mobile', sub: 'Touch-optimised' },
+                  { id: 'desktop' as LayoutMode, label: 'Desktop', sub: 'Sidebar layout' },
+                ] as const).map((l) => {
+                  const active = currentLayout === l.id
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => { applyLayoutMode(l.id); setCurrentLayout(l.id) }}
+                      style={{
+                        flex: 1,
+                        padding: '14px 10px',
+                        background: active ? 'rgba(46,194,126,0.08)' : 'transparent',
+                        border: `2px solid ${active ? 'var(--pip-green)' : 'var(--pip-border)'}`,
+                        cursor: 'pointer',
+                        boxShadow: active ? 'var(--pip-glow)' : 'none',
+                        borderRadius: '4px',
+                        touchAction: 'manipulation',
+                        minHeight: '70px',
+                        fontFamily: 'var(--pip-font)',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.75rem', color: active ? 'var(--pip-green)' : 'var(--pip-text)', fontWeight: active ? 'bold' : 'normal' }}>
+                        {l.label}
+                      </div>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', marginTop: '2px' }}>
+                        {l.sub}
+                      </div>
+                      {active && <div style={{ fontSize: '0.55rem', color: 'var(--pip-green)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>✓ Active</div>}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)', marginTop: '8px' }}>
+                Switch takes effect immediately.
+              </div>
+            </div>
 
             {/* Theme */}
             <div style={{ marginBottom: '24px' }}>

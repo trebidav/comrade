@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react'
 import Login from './components/Login'
-import MapView from './components/MapView'
+import MapViewMobile from './components/MapViewMobile'
+import MapViewDesktop from './components/MapViewDesktop'
 import api, { type User } from './api'
+import { useLayoutMode } from './hooks/useLayoutMode'
+import { getLayoutMode } from './theme'
 import './index.css'
+
+// Apply layout mode on load so data-layout attr is set before first render
+;(function () {
+  document.documentElement.setAttribute('data-layout', getLayoutMode())
+})()
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const { mode } = useLayoutMode()
 
   const fetchUser = async () => {
     try {
@@ -112,5 +121,7 @@ export default function App() {
     return <Login onLogin={handleLogin} />
   }
 
-  return <MapView user={user} onLogout={handleLogout} />
+  return mode === 'desktop'
+    ? <MapViewDesktop user={user} onLogout={handleLogout} />
+    : <MapViewMobile user={user} onLogout={handleLogout} />
 }
