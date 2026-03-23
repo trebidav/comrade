@@ -91,6 +91,137 @@ tasks.find(t => t.is_tutorial ? t.in_progress : (t.state === 2 && t.assignee ===
 ### Django Admin
 Every model field must appear in the admin (`list_display`, `list_filter`, `fieldsets`). See `comrade_core/admin.py`.
 
+---
+
+# Production Deployment (Railway)
+
+## Overview
+
+- **Platform:** Railway (https://railway.app)
+- **Project:** `comrade` (David Třebický's Projects)
+- **Service:** `comrade` (single service — Django/Daphne ASGI + React SPA bundled)
+- **Environment:** `production`
+- **Live URL:** https://comrade-production.up.railway.app
+- **Builder:** Railpack (`railway.toml` + `railpack.json`)
+- **Runtime:** Python 3.12 + Node 22
+
+## Build & Start Pipeline
+
+```
+Git push → Railway detects branch → Railpack build:
+  1. npm install + npm run build        (React → client/dist/)
+  2. collectstatic --noinput            (client/dist + admin → comrade/staticfiles/)
+
+Deploy:
+  3. python manage.py migrate --noinput
+  4. daphne -b 0.0.0.0 -p $PORT comrade.asgi:application
+```
+
+Static files served by **WhiteNoise** directly from Daphne — no nginx, no CDN.
+React SPA (`index.html`) served for all routes not matching `/api/`, `/admin/`, `/static/`, `/media/`.
+
+## Container Layout
+
+```
+/app/
+  Pipfile / Pipfile.lock        # Python deps (Railpack installs into /app/.venv)
+  package.json                  # Root package.json (needed for Railpack Node detection)
+  railway.toml                  # Build + start commands
+  railpack.json                 # Pins Node 22
+  .venv/bin/                    # Python venv (daphne, django-admin, etc.)
+  client/dist/                  # React build output
+  comrade/
+    manage.py
+    comrade/                    # Django project config (settings, urls, asgi)
+    comrade_core/               # Django app
+    staticfiles/                # collectstatic output (WhiteNoise serves from here)
+```
+
+## Railway Services
+
+| Service  | Notes                                                 |
+|----------|-------------------------------------------------------|
+| comrade  | Main app (this repo)                                  |
+| postgres | PostgreSQL — internal host `postgres-wma.railway.internal:5432`, db `railway` |
+| Redis    | External proxy `centerbeam.proxy.rlwy.net:29409`      |
+
+## Required Environment Variables
+
+| Variable                  | Purpose                                              |
+|---------------------------|------------------------------------------------------|
+| `SECRET_KEY`              | Django secret key                                    |
+| `DEBUG`                   | `False` in production                                |
+| `ALLOWED_HOSTS`           | Comma-separated (includes `comrade-production.up.railway.app`) |
+| `DATABASE_URL`            | Full PostgreSQL URL (auto-injected by Railway Postgres plugin) |
+| `REDIS_URL`               | Full Redis URL (auto-injected by Railway Redis plugin) |
+| `CORS_ALLOWED_ORIGINS`    | Comma-separated                                      |
+| `CSRF_TRUSTED_ORIGINS`    | Comma-separated                                      |
+| `GOOGLE_OAUTH_CLIENT_ID`  | Google Cloud Console OAuth client ID                 |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console OAuth secret                 |
+| `GOOGLE_REDIRECT_URI`     | Must match URI in Google Cloud Console               |
+
+## Railway CLI — Cheatsheet
+
+```bash
+# Must be run from inside the comrade/ git repo directory
+
+railway whoami                        # Check login
+railway status                        # Show linked project/env/service
+railway logs --tail 100               # Live runtime logs
+railway logs --build                  # Build logs from last deploy
+railway deployment list               # List recent deploys + status
+railway variables                     # Show all env vars
+railway variable set KEY=value        # Set/update an env var
+railway ssh                           # Interactive shell in running container
+railway ssh -- <cmd>                  # Run single command (e.g. ls /app)
+railway connect postgres              # psql shell
+railway redeploy                      # Rebuild + redeploy current branch
+railway restart                       # Restart container without rebuild
+railway up --detach                   # Deploy from local directory
+```
+
+## Changing the Deploy Branch
+
+Railway dashboard → Service → Settings → Source → Branch.
+Changing the branch immediately triggers a new build.
+
+## Debugging
+
+### Build failures
+```bash
+railway logs --build
+# Common causes:
+# - npm install fails: check client/package.json
+# - collectstatic fails: ensure client/dist/ was produced by the build step
+# - Python install fails: Railpack uses Pipfile — never add requirements.txt
+```
+
+### Runtime failures / crashes
+```bash
+railway logs --tail 200
+
+# SSH in for deeper inspection:
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py check"
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py showmigrations"
+railway ssh -- "ls /app/comrade/staticfiles/"
+railway ssh -- "ls /app/client/dist/"
+```
+
+### Database
+```bash
+railway connect postgres              # Direct psql
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py dbshell"
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py migrate"
+```
+
+## Gotchas
+
+- **Vite base path:** `vite.config.ts` sets `base: '/static/'` in production so asset URLs match WhiteNoise's `/static/` prefix.
+- **No SessionAuthentication:** Removed from DRF — only `TokenAuthentication`. Sending session cookies returns CSRF 403.
+- **ASGI import order:** `django.setup()` must be called before any app module imports in `asgi.py`.
+- **No requirements.txt:** Railpack detects Python via `Pipfile`. Adding `requirements.txt` will break the build.
+- **Migrations at startup:** `migrate --noinput` runs before Daphne on every deploy — new migrations apply automatically.
+
 
 # Comrade: OpenSource task manager for any community. Gamified.
 
