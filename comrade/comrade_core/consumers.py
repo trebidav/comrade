@@ -149,7 +149,8 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     'accuracy': accuracy,
                     'timestamp': timezone.now().isoformat(),
                     'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
-                    'skills': skills
+                    'skills': skills,
+                    'profile_picture': self.user.profile_picture or '',
                 }
 
                 # Send detailed update to all friends - assume they're all active
@@ -173,7 +174,8 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         'latitude': latitude,
                         'longitude': longitude,
                         'accuracy': accuracy,
-                        'timestamp': timezone.now().isoformat()
+                        'timestamp': timezone.now().isoformat(),
+                        'profile_picture': self.user.profile_picture or '',
                     }
 
                     # Get ALL users except self and friends

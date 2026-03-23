@@ -30,7 +30,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "latitude", "longitude", "skills", "is_superuser", "is_staff", "coins", "xp", "total_coins_earned", "total_xp_earned", "task_streak", "level", "level_progress"]
+        fields = ["id", "username", "email", "latitude", "longitude", "skills", "is_superuser", "is_staff", "coins", "xp", "total_coins_earned", "total_xp_earned", "task_streak", "level", "level_progress", "profile_picture"]
 
 
 class PendingReviewSerializer(serializers.ModelSerializer):

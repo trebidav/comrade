@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import api, { type Task, type User, type NewAchievement, STATE_LABELS, haversineKm, formatDistance, formatMinutes, formatCountdown, realTaskId } from '../api'
 import { getTheme, applyTheme, TILE_CONFIGS, type TileConfig } from '../theme'
@@ -10,7 +10,7 @@ import RatingModal from './RatingModal'
 import CreateTaskModal from './CreateTaskModalDesktop'
 import TutorialPanel from './TutorialPanelDesktop'
 import UserInfoPanel from './UserInfoPanelDesktop'
-import Legend from './LegendDesktop'
+
 import AchievementToasts from './AchievementToast'
 import { useLocationSocket } from '../hooks/useLocationSocket'
 
@@ -159,6 +159,20 @@ function taskIcon(
     className: '',
     html: `<div style="width:14px;height:14px;border-radius:50%;background:#555;border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
     iconSize: [14, 14], iconAnchor: [7, 7],
+  })
+}
+
+function profileIcon(pictureUrl: string, borderColor: string, name: string): L.DivIcon {
+  const size = 36
+  const fallback = name.charAt(0).toUpperCase()
+  const inner = pictureUrl
+    ? `<img src="${pictureUrl}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`
+    : `<div style="width:100%;height:100%;border-radius:50%;background:${borderColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;font-family:var(--pip-font)">${fallback}</div>`
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:3px solid ${borderColor};overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.5);background:#222">${inner}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -378,13 +392,12 @@ export default function MapView({ user, onLogout }: Props) {
             <RightClickHandler onRightClick={(lat, lon) => setCreateTaskPos({ lat, lon })} />
           )}
 
-          {/* Self location: blue circle */}
+          {/* Self location */}
           {selfLocation && (
             <>
-              <CircleMarker
-                center={[selfLocation.lat, selfLocation.lon]}
-                radius={10}
-                pathOptions={{ color: 'white', weight: 2, fillColor: '#4285F4', fillOpacity: 1 }}
+              <Marker
+                position={[selfLocation.lat, selfLocation.lon]}
+                icon={profileIcon(currentUser.profile_picture, '#4285F4', currentUser.username)}
               >
                 <Popup>
                   <div style={{ fontFamily: 'monospace', color: 'var(--pip-text)', minWidth: '160px' }}>
@@ -399,7 +412,7 @@ export default function MapView({ user, onLogout }: Props) {
                     )}
                   </div>
                 </Popup>
-              </CircleMarker>
+              </Marker>
               {selfLocation.accuracy > 0 && (
                 <Circle
                   center={[selfLocation.lat, selfLocation.lon]}
@@ -415,13 +428,12 @@ export default function MapView({ user, onLogout }: Props) {
             </>
           )}
 
-          {/* Friend locations: green circles */}
+          {/* Friend locations */}
           {Array.from(friends.values()).map((friend) => (
-            <CircleMarker
+            <Marker
               key={friend.userId}
-              center={[friend.lat, friend.lon]}
-              radius={10}
-              pathOptions={{ color: 'white', weight: 2, fillColor: '#34A853', fillOpacity: 1 }}
+              position={[friend.lat, friend.lon]}
+              icon={profileIcon(friend.profilePicture, '#34A853', friend.name)}
             >
               <Popup>
                 <div style={{ fontFamily: 'monospace', color: 'var(--pip-text)', minWidth: '180px' }}>
@@ -442,16 +454,15 @@ export default function MapView({ user, onLogout }: Props) {
                   )}
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
 
-          {/* Public user locations: yellow circles */}
+          {/* Public user locations */}
           {Array.from(publicUsers.values()).map((pub) => (
-            <CircleMarker
+            <Marker
               key={pub.userId}
-              center={[pub.lat, pub.lon]}
-              radius={10}
-              pathOptions={{ color: 'white', weight: 2, fillColor: '#FBBC05', fillOpacity: 1 }}
+              position={[pub.lat, pub.lon]}
+              icon={profileIcon(pub.profilePicture, '#FBBC05', pub.name)}
             >
               <Popup>
                 <div style={{ fontFamily: 'monospace', color: 'var(--pip-text)', minWidth: '160px' }}>
@@ -466,7 +477,7 @@ export default function MapView({ user, onLogout }: Props) {
                   </button>
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
 
           {/* Task markers */}
@@ -568,15 +579,14 @@ export default function MapView({ user, onLogout }: Props) {
           />
 
           {/* User info panel - top right */}
-          <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} />
+          <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} openAchievements={showAchievementsPanel} onAchievementsClosed={() => setShowAchievementsPanel(false)} />
 
           {/* Chat - bottom left */}
           <Chat messages={chatMessages} onSend={sendChatMessage} />
 
-          {/* Bottom-right column: Center on Me + Legend */}
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+          {/* Bottom-right: Center on Me */}
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000 }}>
             <CenterOnMeInOverlay selfLat={selfLocation?.lat ?? null} selfLon={selfLocation?.lon ?? null} />
-            <Legend />
           </div>
         </div>
       </div>

@@ -99,6 +99,7 @@ export interface User {
   task_streak: number
   level: number
   level_progress: { level: number; current_xp: number; required_xp: number }
+  profile_picture: string
 }
 
 export interface Achievement {

@@ -895,10 +895,18 @@ def google_oauth_callback(request):
             'last_name': id_info.get('family_name', ''),
         },
     )
-    if not created and not user.first_name:
+    # Update profile info from Google on every login
+    update_fields = []
+    if not user.first_name:
         user.first_name = id_info.get('given_name', '')
         user.last_name = id_info.get('family_name', '')
-        user.save(update_fields=['first_name', 'last_name'])
+        update_fields += ['first_name', 'last_name']
+    picture = id_info.get('picture', '')
+    if picture and user.profile_picture != picture:
+        user.profile_picture = picture
+        update_fields.append('profile_picture')
+    if update_fields:
+        user.save(update_fields=update_fields)
 
     drf_token, _ = Token.objects.get_or_create(user=user)
     return redirect(f'/?google_token={drf_token.key}')

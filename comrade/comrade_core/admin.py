@@ -27,7 +27,7 @@ class ComradeUserAdmin(UserAdmin):
     # Define fieldsets explicitly, extending the default UserAdmin fieldsets
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'profile_picture')}),
         ('Permissions', {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),

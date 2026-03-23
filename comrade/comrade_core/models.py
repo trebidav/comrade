@@ -114,6 +114,8 @@ class User(AbstractUser):
 
     welcome_accepted = models.BooleanField(default=False, help_text="Whether the user has accepted the welcome message")
 
+    profile_picture = models.URLField(blank=True, default='', help_text="URL to user's profile picture (e.g. from Google)")
+
     # Friends management
     friends = models.ManyToManyField(
         'self',

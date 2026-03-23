@@ -9,6 +9,7 @@ export interface FriendLocation {
   accuracy: number
   friends: Array<{ id: number; name: string }>
   skills: string[]
+  profilePicture: string
 }
 
 export interface PublicLocation {
@@ -17,6 +18,7 @@ export interface PublicLocation {
   lat: number
   lon: number
   accuracy: number
+  profilePicture: string
 }
 
 export interface SelfLocation {
@@ -214,6 +216,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 accuracy: data.accuracy ?? 0,
                 friends: data.friends ?? [],
                 skills: data.skills ?? [],
+                profilePicture: data.profile_picture ?? '',
               })
               return next
             })
@@ -237,6 +240,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 lat: data.latitude,
                 lon: data.longitude,
                 accuracy: data.accuracy ?? 0,
+                profilePicture: data.profile_picture ?? '',
               })
               return next
             })
