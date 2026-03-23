@@ -45,7 +45,7 @@ def send_task_update(task, action: str, exclude_user_id: int | None = None):
 
 
 def send_user_stats(user):
-    """Push updated coins/XP/level to a specific user."""
+    """Push updated coins/XP/level/skills to a specific user."""
     event = {
         "type": "user_stats_update",
         "coins": float(user.coins),
@@ -55,6 +55,7 @@ def send_user_stats(user):
         "task_streak": user.task_streak,
         "level": user.level,
         "level_progress": user.level_progress,
+        "skills": list(user.skills.values_list('name', flat=True)),
     }
     _send_to_user(user.id, event)
 

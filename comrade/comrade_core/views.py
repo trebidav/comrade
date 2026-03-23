@@ -613,6 +613,8 @@ class TutorialSubmitPartView(APIView):
             progress.datetime_finish = now()
             progress.save()
             new_achievements = request.user.check_and_award_achievements()
+            send_user_stats(request.user)
+            send_achievements(request.user.id, new_achievements)
             return Response({"completed": True, "reward_skill": tutorial.reward_skill.name, "new_achievements": _serialize_achievements(new_achievements)})
 
         return Response({"completed": False, "part_id": part.id})

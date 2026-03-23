@@ -26,12 +26,16 @@ export default function Chat({ messages, onSend }: Props) {
 
   return (
     <div
-      className="pip-panel absolute z-[1000]"
+      className="pip-panel"
       style={{
+        position: 'absolute',
         bottom: '16px',
         left: '16px',
         width: '300px',
+        maxWidth: 'calc(100vw - 32px)',
         height: minimized ? 'auto' : '400px',
+        maxHeight: 'calc(100dvh - 32px)',
+        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         transition: 'height 0.2s',

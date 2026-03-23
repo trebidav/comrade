@@ -56,6 +56,7 @@ export interface UserStatsEvent {
   task_streak: number
   level: number
   level_progress: { level: number; current_xp: number; required_xp: number }
+  skills: string[]
 }
 
 export interface WsAchievement {
