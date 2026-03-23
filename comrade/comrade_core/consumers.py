@@ -175,7 +175,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         'longitude': longitude,
                         'accuracy': accuracy,
                         'timestamp': timezone.now().isoformat(),
-                        'profile_picture': self.user.profile_picture or '',
                     }
 
                     # Get ALL users except self and friends
