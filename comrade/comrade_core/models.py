@@ -478,10 +478,10 @@ class Task(models.Model):
         self.save()
 
     def _can_review(self, user: 'User') -> bool:
-        if user == self.assignee:
-            return False
         if user == self.owner:
             return True
+        if user == self.assignee:
+            return False
         write_skills = self.skill_write.all()
         return write_skills.exists() and user.skills.filter(id__in=write_skills).exists()
 

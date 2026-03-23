@@ -32,6 +32,8 @@ channels = "*"
 channels-redis = "*"
 google-auth-oauthlib = "*"
 python-dotenv = "*"
+psycopg2-binary = "*"
+whitenoise = "*"
 
 [dev-packages]
 black = "==24.3.0"
