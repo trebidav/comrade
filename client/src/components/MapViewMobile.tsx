@@ -151,7 +151,6 @@ function taskIcon(
   proximityKm: number,
 ): L.DivIcon {
   const isMyTask = task.assignee === currentUserId
-  const isTutorialActive = task.is_tutorial && !!task.in_progress
 
   // Tutorial (available or in-progress) — blue book
   if (task.is_tutorial) {
