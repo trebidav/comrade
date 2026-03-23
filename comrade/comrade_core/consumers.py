@@ -128,7 +128,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             accuracy = data.get('accuracy', 50)  # Default accuracy if not provided
 
             # Refresh user from DB to pick up profile_picture and other changes
-            self.user = await database_sync_to_async(User.objects.get)(pk=self.user.pk)
+            await database_sync_to_async(self.user.refresh_from_db)()
 
             # Get user's friends and skills for updates
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
@@ -138,7 +138,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
             # Save location regardless of sharing preferences
             await self.save_user_location(self.user, latitude, longitude)
-            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude}")
+            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude} profile_picture={self.user.profile_picture!r}")
 
             # Only proceed with sharing if not set to NONE
             if self.user.location_sharing_level != User.SharingLevel.NONE:
