@@ -175,27 +175,6 @@ export default function AccountModal({ open, onClose }: Props) {
             <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)' }}>Loading...</div>
           ) : (
             <>
-              {userData && (
-                <>
-                  {sectionLabel('Stats')}
-                  <div style={{ display: 'flex', gap: '24px', marginBottom: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block' }} />
-                          Coins
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{Math.round(userData.coins)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>XP</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{Math.round(userData.xp)}</div>
-                    </div>
-                  </div>
-                </>
-              )}
-
               {sectionLabel('Layout')}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 {([

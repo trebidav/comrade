@@ -123,28 +123,6 @@ export default function AccountModal({ open, onClose }: Props) {
           </div>
         ) : (
           <>
-            {/* Stats */}
-            {userData && (
-              <div style={{ marginBottom: '24px' }}>
-                <div className="section-label">Stats</div>
-                <div style={{ display: 'flex', gap: '24px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block' }} />
-                        Coins
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{Math.round(userData.coins)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>XP</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{Math.round(userData.xp)}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Layout */}
             <div style={{ marginBottom: '24px' }}>
               <div className="section-label">Layout</div>
