@@ -16,13 +16,17 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include, path
-from rest_framework import routers
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+from comrade_core import views
 
 urlpatterns = [
-    path("", include("comrade_core.urls")),
-    path("admin/", admin.site.urls),
-    path("api-auth/", include("rest_framework.urls")),
-    path("accounts/", include("allauth.urls")),
-    path("_allauth/", include("allauth.headless.urls")),
-]
+    path('admin/', admin.site.urls),
+    path('', include('comrade_core.urls')),  # Include all comrade_core URLs
+    path('login/', views.login_page, name='login_page'),
+    path('map/', views.map, name='map'),
+    path('api/user/info/', views.get_user_info, name='get_user_info'),
+    path('auth/google-config/', views.google_config, name='google_config'),
+    path('accounts/google/login/callback/', views.google_oauth_callback, name='google_oauth_callback'),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

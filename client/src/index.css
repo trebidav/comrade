@@ -1,0 +1,239 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* ── Pip-Boy theme (default) ─────────────────────────────────────────────── */
+:root {
+  --pip-green: #2ec27e;
+  --pip-green-dark: #1a7346;
+  --pip-green-light: #33d688;
+  --pip-bg: #0a0f0d;
+  --pip-panel-bg: rgba(10, 15, 13, 0.92);
+  --pip-border: #1a7346;
+  --pip-text: #33d688;
+  --pip-glow: 0 0 10px rgba(46, 194, 126, 0.5);
+  --pip-font: monospace;
+  --pip-btn-hover-bg: rgba(46, 194, 126, 0.15);
+  --pip-popup-hover-bg: rgba(46, 194, 126, 0.2);
+  --pip-scanlines-opacity: 0.3;
+  --pip-scrollbar-track: #050805;
+}
+
+/* ── Desert / Egypt theme ────────────────────────────────────────────────── */
+[data-theme="desert"] {
+  --pip-green: #d4a843;
+  --pip-green-dark: #8b6914;
+  --pip-green-light: #f0d080;
+  --pip-bg: #1c1408;
+  --pip-panel-bg: rgba(28, 20, 8, 0.93);
+  --pip-border: #8b6914;
+  --pip-text: #e8c87a;
+  --pip-glow: 0 0 10px rgba(212, 168, 67, 0.5);
+  --pip-font: 'Cinzel', 'Palatino Linotype', Palatino, serif;
+  --pip-btn-hover-bg: rgba(212, 168, 67, 0.15);
+  --pip-popup-hover-bg: rgba(212, 168, 67, 0.2);
+  --pip-scanlines-opacity: 0.12;
+  --pip-scrollbar-track: #110d04;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--pip-font);
+  background: var(--pip-bg);
+  color: var(--pip-text);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--pip-scanlines-opacity);
+}
+
+
+#root {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pip-panel {
+  background: var(--pip-panel-bg);
+  border: 1px solid var(--pip-border);
+  box-shadow: var(--pip-glow);
+  color: var(--pip-text);
+  font-family: var(--pip-font);
+}
+
+.pip-btn {
+  background: transparent;
+  border: 1px solid var(--pip-border);
+  color: var(--pip-text);
+  font-family: var(--pip-font);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.pip-btn:hover {
+  background: var(--pip-btn-hover-bg);
+  box-shadow: var(--pip-glow);
+}
+
+.pip-btn-primary {
+  background: var(--pip-green-dark);
+  border-color: var(--pip-green);
+  color: var(--pip-bg);
+  font-weight: bold;
+}
+
+.pip-btn-primary:hover {
+  background: var(--pip-green);
+  box-shadow: var(--pip-glow);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pip-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pip-green-dark);
+  border: 1px solid var(--pip-green);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pip-green);
+}
+
+/* Rating slider with red→green gradient track */
+input.rating-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #EA4335, #34A853);
+  outline: none;
+  cursor: pointer;
+}
+input.rating-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FBBC05;
+  border: 2px solid var(--pip-bg);
+  cursor: pointer;
+}
+input.rating-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FBBC05;
+  border: 2px solid var(--pip-bg);
+  cursor: pointer;
+}
+
+/* Leaflet popup themed */
+.leaflet-popup-content-wrapper {
+  background: var(--pip-panel-bg) !important;
+  border: 1px solid var(--pip-border) !important;
+  box-shadow: var(--pip-glow) !important;
+  color: var(--pip-text) !important;
+  font-family: var(--pip-font) !important;
+  border-radius: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: var(--pip-border) !important;
+}
+
+.leaflet-popup-close-button {
+  color: var(--pip-green) !important;
+  font-size: 18px !important;
+}
+
+.pip-popup-btn {
+  display: inline-block;
+  background: transparent;
+  border: 1px solid var(--pip-border);
+  color: var(--pip-text);
+  font-family: var(--pip-font);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  margin: 2px;
+}
+
+.pip-popup-btn:hover {
+  background: var(--pip-popup-hover-bg);
+}
+
+.pip-popup-btn-primary {
+  background: var(--pip-green-dark);
+  color: var(--pip-bg);
+  font-weight: bold;
+}
+
+/* ── Task map markers ─────────────────────────────────────────────────────── */
+.task-marker-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.task-marker-svg-spin {
+  animation: task-spin 1.4s linear infinite;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.task-marker-stopwatch {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  user-select: none;
+}
+
+@keyframes task-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes pip-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}

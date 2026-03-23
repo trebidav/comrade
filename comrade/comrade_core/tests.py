@@ -36,4 +36,38 @@ class TaskTestCase(TestCase):
         try:
             t.start(u)
         except ValidationError:
-            self.fail("start should pass when user has at least one required skill")
+            self.fail("start should pass when user has all required skills")
+
+    def test_task_start_fails_when_user_has_only_some_required_skills(self):
+        s1 = Skill.objects.create(name="multiskill1")
+        s2 = Skill.objects.create(name="multiskill2")
+        u = User.objects.create(username="partialskilluser")
+        t = Task.objects.create()
+        t.skill_execute.add(s1, s2)
+        u.skills.add(s1)  # only one of two required skills
+
+        self.assertEqual(t.skill_execute.count(), 2)
+        self.assertEqual(u.skills.count(), 1)
+
+        try:
+            t.start(u)
+        except ValidationError:
+            pass
+        else:
+            self.fail("start should fail when user has only some of the required skills")
+
+    def test_task_start_succeeds_when_user_has_all_multiple_required_skills(self):
+        s1 = Skill.objects.create(name="multiskill3")
+        s2 = Skill.objects.create(name="multiskill4")
+        u = User.objects.create(username="fullskilluser")
+        t = Task.objects.create()
+        t.skill_execute.add(s1, s2)
+        u.skills.add(s1, s2)
+
+        self.assertEqual(t.skill_execute.count(), 2)
+        self.assertEqual(u.skills.count(), 2)
+
+        try:
+            t.start(u)
+        except ValidationError:
+            self.fail("start should pass when user has all required skills")
