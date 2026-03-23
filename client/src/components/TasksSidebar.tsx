@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { type Task, STATE_LABELS, haversineKm, formatDistance, formatMinutes, formatCountdown } from '../api'
 import ReviewModal from './ReviewModal'
+import { TaskListSkeleton } from './Skeleton'
+import { useHaptics } from '../hooks/useHaptics'
+import { IconTasksEmpty, IconBoltEmpty, IconTrophy } from './Icons'
 
 interface Props {
   tasks: Task[]
@@ -18,12 +21,7 @@ interface Props {
 }
 
 const STATE_COLORS: Record<number, string> = {
-  0: '#555',
-  1: '#4285F4',
-  2: '#FBBC05',
-  3: '#9b59b6',
-  4: '#e67e22',
-  5: '#34A853',
+  0: '#555', 1: '#4285F4', 2: '#FBBC05', 3: '#9b59b6', 4: '#e67e22', 5: '#34A853',
 }
 
 type View = 'all' | 'active' | 'owned'
@@ -35,6 +33,8 @@ function canReview(task: Task, userId: number, userSkills: string[]): boolean {
 }
 
 export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, proximityKm, coinsModifier, xpModifier, timeModifierMinutes, criticalityPercentage, pauseMultiplier, onTaskClick, onAction }: Props) {
+  const haptics = useHaptics()
+
   const getDistance = (task: Task): number | null => {
     if (!selfLocation || task.lat == null || task.lon == null) return null
     return haversineKm(selfLocation.lat, selfLocation.lon, task.lat, task.lon)
@@ -68,17 +68,17 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
     .sort((a, b) => {
       const canExec = (t: Task) => t.skill_execute_names.length === 0 || t.skill_execute_names.some((s) => userSkills.includes(s))
       const priority = (t: Task) => {
-        if (t.state === 5) return 1              // DONE+respawn — middle
-        return canExec(t) && inProximity(t) ? 0 : 2  // available first, unavailable last
+        if (t.state === 5) return 1
+        return canExec(t) && inProximity(t) ? 0 : 2
       }
       const pa = priority(a), pb = priority(b)
       if (pa !== pb) return pa - pb
-      const da = getDistance(a) ?? Infinity
-      const db = getDistance(b) ?? Infinity
-      return da - db
+      return (getDistance(a) ?? Infinity) - (getDistance(b) ?? Infinity)
     })
+
   const [view, setView] = useState<View>('all')
   const [reviewTask, setReviewTask] = useState<Task | null>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -87,22 +87,26 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   }, [])
 
   useEffect(() => {
-    if (tasks.length > 0) {
-      const ownedInReview = ownedTasks.some((t) => t.state === 4)
-      if (ownedInReview) setView('owned')
+    if (tasks.length > 0 || initialLoading) {
+      setInitialLoading(false)
+      if (ownedTasks.some((t) => t.state === 4)) setView('owned')
       else if (activeTasks.length > 0) setView('active')
       else setView('all')
     }
-  }, [tasks])
+  }, [tasks.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark as loaded after mount
+  useEffect(() => {
+    const t = setTimeout(() => setInitialLoading(false), 800)
+    return () => clearTimeout(t)
+  }, [])
 
   const displayedTasks = view === 'active' ? activeTasks : view === 'owned' ? ownedTasks : startableTasks
 
-  const HEADER: Record<View, string> = { all: 'My Tasks', active: 'Active Tasks', owned: 'Owned Tasks' }
-
-  const tabs: { key: View; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'active', label: activeTasks.length > 0 ? `Active (${activeTasks.length})` : 'Active' },
-    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: ownedTasks.filter((t) => t.state === 4).length > 0 ? `Owned (${ownedTasks.filter((t) => t.state === 4).length})` : 'Owned' }] : []),
+  const tabs: { key: View; label: string; badge?: number }[] = [
+    { key: 'all', label: 'All', badge: startableTasks.length },
+    { key: 'active', label: 'Active', badge: activeTasks.length },
+    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.state === 4).length || undefined }] : []),
   ]
 
   const handleAccept = async () => {
@@ -110,7 +114,6 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
     await onAction('accept_review', reviewTask.id)
     setReviewTask(null)
   }
-
   const handleDecline = async () => {
     if (!reviewTask) return
     await onAction('decline_review', reviewTask.id)
@@ -119,234 +122,198 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
 
   return (
     <>
-      <div
-        className="pip-panel absolute z-[1000]"
-        style={{
-          top: '16px',
-          left: '16px',
-          width: '250px',
-          maxHeight: 'calc(100vh - 450px)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: '10px 14px',
-            borderBottom: '1px solid var(--pip-border)',
-            fontSize: '0.75rem',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--pip-green)',
-            flexShrink: 0,
-          }}
-        >
-          {HEADER[view]}
-          <span
-            style={{
-              float: 'right',
-              background: 'var(--pip-green-dark)',
-              color: 'var(--pip-bg)',
-              borderRadius: '2px',
-              padding: '0 6px',
-              fontSize: '0.65rem',
-            }}
-          >
-            {displayedTasks.length}
-          </span>
-        </div>
-
-        {/* View toggle */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--pip-border)', flexShrink: 0 }}>
-          {tabs.map((tab, i) => (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--glass-border)', flexShrink: 0 }}>
+          {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setView(tab.key)}
+              onClick={() => { haptics.light(); setView(tab.key) }}
               style={{
                 flex: 1,
-                padding: '5px',
-                fontSize: '0.6rem',
+                padding: '12px 6px',
+                fontSize: '0.7rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
-                background: view === tab.key ? 'rgba(46,194,126,0.12)' : 'transparent',
+                background: view === tab.key ? 'rgba(46,194,126,0.08)' : 'transparent',
                 color: view === tab.key ? 'var(--pip-green)' : 'var(--pip-green-dark)',
                 border: 'none',
-                borderRight: i < tabs.length - 1 ? '1px solid var(--pip-border)' : 'none',
                 cursor: 'pointer',
                 fontFamily: 'var(--pip-font)',
+                borderBottom: view === tab.key ? '2px solid var(--pip-green)' : '2px solid transparent',
+                touchAction: 'manipulation',
+                minHeight: '44px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                transition: 'color 0.15s, background 0.15s',
               }}
             >
               {tab.label}
+              {tab.badge != null && tab.badge > 0 && (
+                <span style={{
+                  background: view === tab.key ? 'var(--pip-green)' : 'var(--pip-green-dark)',
+                  color: 'var(--pip-bg)',
+                  borderRadius: '8px',
+                  padding: '1px 6px',
+                  fontSize: '0.6rem',
+                  fontWeight: 'bold',
+                  transition: 'background 0.15s',
+                }}>
+                  {tab.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Task list */}
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          {displayedTasks.length === 0 ? (
-            <div
-              style={{
-                padding: '16px 14px',
-                fontSize: '0.75rem',
-                color: 'var(--pip-green-dark)',
-                textAlign: 'center',
-              }}
-            >
+        <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+          {initialLoading && tasks.length === 0 ? (
+            <TaskListSkeleton />
+          ) : displayedTasks.length === 0 ? (
+            <div style={{
+              padding: '40px 16px',
+              fontSize: '0.85rem',
+              color: 'var(--pip-green-dark)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              animation: 'scaleIn 0.3s var(--spring) both',
+            }}>
+              <div style={{ opacity: 0.45 }}>
+                {view === 'active' ? <IconBoltEmpty color="var(--pip-green-dark)" /> : view === 'owned' ? <IconTrophy size={48} color="var(--pip-green-dark)" /> : <IconTasksEmpty color="var(--pip-green-dark)" />}
+              </div>
               {view === 'active' ? 'No active tasks' : view === 'owned' ? 'No owned tasks' : 'No available tasks'}
             </div>
           ) : (
-            displayedTasks.map((task) => {
+            displayedTasks.map((task, index) => {
               const dist = getDistance(task)
               const canExecute = task.skill_execute_names.length === 0 || task.skill_execute_names.some((s) => userSkills.includes(s))
               const near = view !== 'all' || (inProximity(task) && canExecute)
+              const isActive = task.is_tutorial ? task.in_progress : task.state === 2
+
               return (
-              <div
-                key={task.id}
-                onClick={() => onTaskClick(task)}
-                style={{
-                  padding: '8px 14px',
-                  borderBottom: '1px solid rgba(26, 115, 70, 0.3)',
-                  borderLeft: (task.is_tutorial ? task.in_progress : task.state === 2) ? '3px solid #FBBC05' : '3px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'background 0.1s',
-                  opacity: task.state === 5 ? 0.4 : (near ? 1 : 0.45),
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = 'rgba(46, 194, 126, 0.08)'
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = 'transparent'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-                  <div
-                    style={{
-                      fontSize: '0.78rem',
-                      color: task.is_tutorial ? '#FBBC05' : 'var(--pip-text)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    {task.is_tutorial && <span style={{ marginRight: '3px' }}>★</span>}{task.name}
+                <div
+                  key={task.id}
+                  className="task-item-enter"
+                  onClick={() => { haptics.light(); onTaskClick(task) }}
+                  style={{
+                    padding: '14px 16px',
+                    borderBottom: '1px solid rgba(26, 115, 70, 0.2)',
+                    borderLeft: isActive ? '3px solid #FBBC05' : '3px solid transparent',
+                    cursor: 'pointer',
+                    opacity: task.state === 5 ? 0.45 : (near ? 1 : 0.5),
+                    touchAction: 'manipulation',
+                    transition: 'background 0.12s',
+                    animationDelay: `${Math.min(index, 5) * 40}ms`,
+                  }}
+                  onPointerDown={(e) => { e.currentTarget.style.background = 'var(--pip-btn-hover-bg)' }}
+                  onPointerUp={(e) => { e.currentTarget.style.background = '' }}
+                  onPointerLeave={(e) => { e.currentTarget.style.background = '' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px' }}>
+                    <div style={{ fontSize: '0.9rem', color: task.is_tutorial ? '#FBBC05' : 'var(--pip-text)', flex: 1, minWidth: 0, fontWeight: '500' }}>
+                      {task.name}
+                    </div>
+                    {dist !== null && (
+                      <span style={{
+                        fontSize: '0.68rem',
+                        color: inProximity(task) ? '#34A853' : '#EA4335',
+                        flexShrink: 0,
+                        fontWeight: 'bold',
+                      }}>
+                        {formatDistance(dist)}
+                      </span>
+                    )}
                   </div>
-                  {dist !== null && (
-                    <span style={{ fontSize: '0.6rem', color: inProximity(task) ? 'var(--pip-green-dark)' : '#EA4335', marginLeft: '6px', flexShrink: 0 }}>
-                      {formatDistance(dist)}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {!task.is_tutorial && task.state != null && (
-                    <span
-                      style={{
-                        fontSize: '0.6rem',
-                        padding: '1px 6px',
-                        border: `1px solid ${STATE_COLORS[task.state]}`,
-                        color: STATE_COLORS[task.state],
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      {STATE_LABELS[task.state] ?? 'Unknown'}
-                    </span>
-                  )}
-                  {task.is_tutorial && (
-                    <span style={{ fontSize: '0.6rem', padding: '1px 6px', border: '1px solid #FBBC05', color: '#FBBC05', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {task.in_progress ? 'In Progress' : 'Tutorial'}
-                    </span>
-                  )}
-                  {task.minutes != null && (
-                    <span style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', letterSpacing: '0.03em' }}>
-                      {formatMinutes(task.minutes)}
-                    </span>
-                  )}
-                  {task.coins != null && (() => {
-                    const tm = (task.minutes && timeModifierMinutes > 0) ? task.minutes / timeModifierMinutes : 1.0
-                    const cf = 1.0 + ((task.criticality ?? 1) - 1) * criticalityPercentage
-                    return (
-                      <>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.6rem', color: '#FBBC05' }}>
-                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block', flexShrink: 0 }} />
-                          {Math.round(task.coins * coinsModifier * tm)}
-                        </span>
-                        {task.xp != null && (() => {
-                          const base = Math.round(task.xp * xpModifier * tm)
-                          const extra = Math.round(task.xp * xpModifier * tm * cf) - base
-                          return (
-                            <span style={{ fontSize: '0.6rem', color: '#4285F4', letterSpacing: '0.03em' }}>
-                              XP:{base}{extra > 0 && <span style={{ color: '#89b4f8' }}>+{extra}</span>}
-                            </span>
-                          )
-                        })()}
-                      </>
-                    )
-                  })()}
-                  {!task.lat && !task.lon && (
-                    <span style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)' }}>no location</span>
-                  )}
-                  {/* Paused reset countdown badge */}
-                  {task.state === 3 && task.datetime_paused && task.minutes != null && (
-                    <span style={{ fontSize: '0.6rem', color: '#e67e22', letterSpacing: '0.03em' }}>
-                      ⏱ {formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}
-                    </span>
-                  )}
-                  {/* Respawn countdown badge */}
-                  {task.state === 5 && task.datetime_respawn && (
-                    <span style={{ fontSize: '0.6rem', color: '#9b59b6', letterSpacing: '0.03em' }}>
-                      ↺ {formatCountdown(task.datetime_respawn)}
-                    </span>
-                  )}
-                  {/* Pending review badge */}
-                  {task.pending_review && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setReviewTask(task) }}
-                      style={{
-                        fontSize: '0.55rem',
-                        padding: '1px 6px',
-                        background: 'rgba(230,126,34,0.15)',
-                        border: '1px solid rgba(230,126,34,0.6)',
-                        color: '#e67e22',
-                        borderRadius: '2px',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--pip-font)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      Pending Review
-                    </button>
-                  )}
-                </div>
-                {task.skill_execute_names.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
-                    {task.skill_execute_names.map((s) => {
-                      const has = userSkills.includes(s)
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
+                    {!task.is_tutorial && task.state != null && (
+                      <span className="state-badge" style={{ borderColor: STATE_COLORS[task.state], color: STATE_COLORS[task.state] }}>
+                        {STATE_LABELS[task.state] ?? 'Unknown'}
+                      </span>
+                    )}
+                    {task.is_tutorial && (
+                      <span className="state-badge" style={{ borderColor: '#FBBC05', color: '#FBBC05' }}>
+                        {task.in_progress ? 'In Progress' : 'Tutorial'}
+                      </span>
+                    )}
+                    {task.minutes != null && (
+                      <span style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)' }}>⏱ {formatMinutes(task.minutes)}</span>
+                    )}
+                    {task.coins != null && (() => {
+                      const tm = (task.minutes && timeModifierMinutes > 0) ? task.minutes / timeModifierMinutes : 1.0
+                      const cf = 1.0 + ((task.criticality ?? 1) - 1) * criticalityPercentage
                       return (
-                        <span
-                          key={s}
-                          style={{
-                            fontSize: '0.55rem',
-                            padding: '1px 5px',
-                            background: has ? 'rgba(52,168,83,0.15)' : 'rgba(234,67,53,0.15)',
-                            border: `1px solid ${has ? 'rgba(52,168,83,0.4)' : 'rgba(234,67,53,0.4)'}`,
-                            color: has ? '#34A853' : '#EA4335',
-                            borderRadius: '2px',
-                          }}
-                        >
-                          {s}
-                        </span>
+                        <>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#FBBC05' }}>
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block', flexShrink: 0 }} />
+                            {Math.round(task.coins * coinsModifier * tm)}
+                          </span>
+                          {task.xp != null && (() => {
+                            const base = Math.round(task.xp * xpModifier * tm)
+                            const extra = Math.round(task.xp * xpModifier * tm * cf) - base
+                            return (
+                              <span style={{ fontSize: '0.65rem', color: '#4285F4' }}>
+                                XP:{base}{extra > 0 && <span style={{ color: '#89b4f8' }}>+{extra}</span>}
+                              </span>
+                            )
+                          })()}
+                        </>
                       )
-                    })}
+                    })()}
+                    {task.state === 3 && task.datetime_paused && task.minutes != null && (
+                      <span style={{ fontSize: '0.65rem', color: '#e67e22' }}>
+                        ⏱ {formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}
+                      </span>
+                    )}
+                    {task.state === 5 && task.datetime_respawn && (
+                      <span style={{ fontSize: '0.65rem', color: '#9b59b6' }}>
+                        ↺ {formatCountdown(task.datetime_respawn)}
+                      </span>
+                    )}
+                    {task.pending_review && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); haptics.medium(); setReviewTask(task) }}
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '3px 8px',
+                          background: 'rgba(230,126,34,0.15)',
+                          border: '1px solid rgba(230,126,34,0.6)',
+                          color: '#e67e22',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--pip-font)',
+                          textTransform: 'uppercase',
+                          minHeight: '28px',
+                          touchAction: 'manipulation',
+                        }}
+                      >
+                        Review
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-            )
-          })
-        )}
+
+                  {task.skill_execute_names.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '7px' }}>
+                      {task.skill_execute_names.map((s) => {
+                        const has = userSkills.includes(s)
+                        return (
+                          <span key={s} className={`skill-tag ${has ? 'skill-tag-has' : 'skill-tag-missing'}`}>
+                            {s}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
       </div>
 

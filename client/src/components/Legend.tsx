@@ -1,4 +1,11 @@
+// Legend removed for mobile layout
 export default function Legend() {
+  return null
+}
+
+/* eslint-disable */
+// @ts-ignore
+function LegendFull() {
   const circles = [
     { color: '#4285F4', label: 'Your Location' },
     { color: '#34A853', label: 'Friends' },

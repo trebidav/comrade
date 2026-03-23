@@ -3,6 +3,8 @@ import { type User } from '../api'
 import FriendRequestsModal from './FriendRequestsModal'
 import AccountModal from './AccountModal'
 import AchievementsPanel from './AchievementsPanel'
+import { useHaptics } from '../hooks/useHaptics'
+import { IconFriends, IconTrophy, IconSettings, IconLogout } from './Icons'
 
 interface Props {
   user: User
@@ -14,11 +16,12 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
   const [showAccount, setShowAccount] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
   const [friendRequestCount, setFriendRequestCount] = useState(0)
+  const haptics = useHaptics()
 
   const lp = user.level_progress ?? { level: user.level ?? 0, current_xp: 0, required_xp: 1000 }
   const levelPct = lp.required_xp > 0 ? Math.min(100, (lp.current_xp / lp.required_xp) * 100) : 0
+  const initial = (user.username?.[0] ?? '?').toUpperCase()
 
-  // Poll friend requests count in background even when modal is closed
   useEffect(() => {
     const fetchCount = async () => {
       try {
@@ -31,148 +34,161 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
           const data = await res.json()
           setFriendRequestCount(data.pending_requests?.length ?? 0)
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
     fetchCount()
     const interval = setInterval(fetchCount, 30000)
     return () => clearInterval(interval)
   }, [])
 
+  const menuItems = [
+    {
+      label: 'Friend Requests',
+      icon: <IconFriends size={20} />,
+      badge: friendRequestCount,
+      onClick: () => { haptics.light(); setShowFriendRequests(true) },
+    },
+    {
+      label: 'Achievements',
+      icon: <IconTrophy size={20} />,
+      onClick: () => { haptics.light(); setShowAchievements(true) },
+    },
+    {
+      label: 'Account Settings',
+      icon: <IconSettings size={20} />,
+      onClick: () => { haptics.light(); setShowAccount(true) },
+    },
+  ]
+
   return (
     <>
-      <div
-        className="pip-panel absolute z-[1000]"
-        style={{
-          top: '16px',
-          right: '16px',
-          width: '180px',
-          padding: '12px',
-        }}
-      >
-        <div
-          style={{
-            fontSize: '0.65rem',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--pip-green)',
-            borderBottom: '1px solid var(--pip-border)',
-            paddingBottom: '6px',
-            marginBottom: '8px',
-          }}
-        >
-          COMRADE v0.1.0-beta
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* User header */}
+        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--glass-border)' }}>
+          <div style={{ fontSize: '0.55rem', letterSpacing: '0.12em', color: 'var(--pip-green)', textTransform: 'uppercase', marginBottom: '14px' }}>
+            COMRADE v0.1.0-beta
+          </div>
 
-        <div style={{ fontSize: '0.8rem', marginBottom: '2px', color: 'var(--pip-text)' }}>
-          {user.username}
-        </div>
-        <div
-          style={{
-            fontSize: '0.65rem',
-            color: 'var(--pip-green-dark)',
-            marginBottom: '8px',
-            wordBreak: 'break-all',
-          }}
-        >
-          {user.email}
-        </div>
-
-        {/* Level bar */}
-        <div style={{ marginBottom: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-            <span style={{ fontSize: '0.6rem', color: 'var(--pip-green)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Level {lp.level}
-            </span>
-            <span style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)' }}>
-              {Math.floor(lp.current_xp)} / {Math.floor(lp.required_xp)} XP
-            </span>
-          </div>
-          <div style={{ height: '4px', background: 'rgba(46,194,126,0.15)', borderRadius: '2px' }}>
-            <div style={{ height: '100%', width: `${levelPct}%`, background: '#34A853', borderRadius: '2px', transition: 'width 0.3s' }} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'baseline' }}>
-          <div style={{ minWidth: '60px' }}>
-            <div style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Coins</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{Math.round(user.coins)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>XP</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{Math.round(user.xp)}</div>
-          </div>
-          {(user.task_streak ?? 0) > 1 && (
-            <div>
-              <div style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Streak</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#FBBC05' }}>🔥{user.task_streak}</div>
+          {/* Avatar + username row */}
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="avatar">{initial}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '2px' }}>
+                {user.username}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--pip-green-dark)', wordBreak: 'break-all' }}>
+                {user.email}
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* Level bar */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--pip-green)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Level {lp.level}
+              </span>
+              <span style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)' }}>
+                {Math.floor(lp.current_xp)} / {Math.floor(lp.required_xp)} XP
+              </span>
+            </div>
+            <div className="level-bar-track">
+              <div className="level-bar-fill" style={{ width: `${levelPct}%` }} />
+            </div>
+          </div>
+
+          {/* Stats row — glassmorphism cards */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="stat-card" style={{ animationDelay: '0ms' }}>
+              <div style={{ fontSize: '0.5rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Coins</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block' }} />
+                {Math.round(user.coins)}
+              </div>
+            </div>
+            <div className="stat-card" style={{ animationDelay: '60ms' }}>
+              <div style={{ fontSize: '0.5rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>XP</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: '#4285F4' }}>{Math.round(user.xp)}</div>
+            </div>
+            {(user.task_streak ?? 0) > 1 && (
+              <div className="stat-card" style={{ animationDelay: '120ms' }}>
+                <div style={{ fontSize: '0.5rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Streak</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: '#FBBC05' }}>🔥{user.task_streak}</div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            className="pip-btn"
-            onClick={() => setShowFriendRequests(true)}
-            style={{ position: 'relative', textAlign: 'left' }}
-          >
-            Friend Requests
-            {friendRequestCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
+        {/* Menu items */}
+        <div style={{ padding: '4px 16px', overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+          {menuItems.map((item) => (
+            <button
+              key={item.label}
+              onClick={item.onClick}
+              className="menu-row"
+              style={{ width: '100%', border: 'none', color: 'var(--pip-text)', fontFamily: 'var(--pip-font)', textAlign: 'left' }}
+            >
+              <span style={{ width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ fontSize: '0.9rem', flex: 1 }}>{item.label}</span>
+              {item.badge != null && item.badge > 0 && (
+                <span style={{
                   background: '#EA4335',
                   color: 'white',
-                  borderRadius: '50%',
-                  width: '16px',
-                  height: '16px',
-                  fontSize: '0.6rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontSize: '0.65rem',
                   fontWeight: 'bold',
-                }}
-              >
-                {friendRequestCount > 9 ? '9+' : friendRequestCount}
-              </span>
-            )}
-          </button>
-
-          <button className="pip-btn" onClick={() => setShowAchievements(true)}>
-            Achievements
-          </button>
-
-          <button className="pip-btn" onClick={() => setShowAccount(true)}>
-            Account Settings
-          </button>
+                  fontFamily: 'monospace',
+                }}>
+                  {item.badge > 9 ? '9+' : item.badge}
+                </span>
+              )}
+              <span style={{ color: 'var(--pip-green-dark)', fontSize: '1rem' }}>›</span>
+            </button>
+          ))}
 
           <button
-            className="pip-btn"
-            onClick={onLogout}
-            style={{ borderColor: '#EA4335', color: '#EA4335' }}
+            onClick={() => { haptics.medium(); onLogout() }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              padding: '16px 0',
+              background: 'transparent',
+              border: 'none',
+              color: '#EA4335',
+              cursor: 'pointer',
+              fontFamily: 'var(--pip-font)',
+              textAlign: 'left',
+              width: '100%',
+              touchAction: 'manipulation',
+              minHeight: '56px',
+              marginTop: '8px',
+              transition: 'padding-left 0.15s var(--ease-out-expo)',
+            }}
+            onPointerDown={(e) => (e.currentTarget.style.paddingLeft = '6px')}
+            onPointerUp={(e) => (e.currentTarget.style.paddingLeft = '0')}
+            onPointerLeave={(e) => (e.currentTarget.style.paddingLeft = '0')}
           >
-            Logout
+            <span style={{ width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconLogout size={20} color="#EA4335" /></span>
+            <span style={{ fontSize: '0.9rem' }}>Logout</span>
           </button>
         </div>
       </div>
 
-      {showFriendRequests && (
-        <FriendRequestsModal
-          onClose={() => setShowFriendRequests(false)}
-          onBadgeUpdate={setFriendRequestCount}
-        />
-      )}
-
-      {showAccount && (
-        <AccountModal onClose={() => setShowAccount(false)} />
-      )}
-
-      {showAchievements && (
-        <AchievementsPanel onClose={() => setShowAchievements(false)} />
-      )}
+      <FriendRequestsModal
+        open={showFriendRequests}
+        onClose={() => setShowFriendRequests(false)}
+        onBadgeUpdate={setFriendRequestCount}
+      />
+      <AccountModal
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+      />
+      <AchievementsPanel
+        open={showAchievements}
+        onClose={() => setShowAchievements(false)}
+      />
     </>
   )
 }

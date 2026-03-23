@@ -1,5 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { type NewAchievement } from '../api'
+import { useHaptics } from '../hooks/useHaptics'
+import { IconAchievement } from './Icons'
 
 interface Props {
   toasts: NewAchievement[]
@@ -8,18 +10,7 @@ interface Props {
 
 export default function AchievementToasts({ toasts, onDismiss }: Props) {
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '80px',
-        right: '16px',
-        zIndex: 3000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        pointerEvents: 'none',
-      }}
-    >
+    <div className="toast-container">
       {toasts.map((t) => (
         <AchievementToastItem key={t.id} achievement={t} onDismiss={onDismiss} />
       ))}
@@ -28,47 +19,57 @@ export default function AchievementToasts({ toasts, onDismiss }: Props) {
 }
 
 function AchievementToastItem({ achievement, onDismiss }: { achievement: NewAchievement; onDismiss: (id: number) => void }) {
+  const [exiting, setExiting] = useState(false)
+  const haptics = useHaptics()
+
   useEffect(() => {
-    const timer = setTimeout(() => onDismiss(achievement.id), 5000)
+    haptics.success()
+    const timer = setTimeout(() => {
+      setExiting(true)
+      setTimeout(() => onDismiss(achievement.id), 320)
+    }, 4700)
     return () => clearTimeout(timer)
-  }, [achievement.id, onDismiss])
+  }, [achievement.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleClick = () => {
+    if (exiting) return
+    setExiting(true)
+    setTimeout(() => onDismiss(achievement.id), 320)
+  }
 
   return (
     <div
-      className="pip-panel"
-      style={{
-        padding: '10px 14px',
-        minWidth: '220px',
-        maxWidth: '280px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        pointerEvents: 'auto',
-        animation: 'fadeInRight 0.3s ease-out',
-        borderColor: '#34A853',
-        boxShadow: '0 0 12px rgba(52,168,83,0.4)',
-      }}
+      className={`achievement-toast${exiting ? ' toast-exiting' : ''}`}
+      onClick={handleClick}
     >
-      <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{achievement.icon || '🏆'}</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px' }}>
+      <span style={{ flexShrink: 0 }}>
+        {achievement.icon
+          ? <span style={{ fontSize: '1.4rem' }}>{achievement.icon}</span>
+          : <IconAchievement />
+        }
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px' }}>
           Achievement Unlocked!
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--pip-green)', fontWeight: 'bold' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--pip-green)', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {achievement.name}
         </div>
-        {achievement.description && (
-          <div style={{ fontSize: '0.62rem', color: 'var(--pip-green-dark)', marginTop: '2px' }}>
-            {achievement.description}
-          </div>
-        )}
       </div>
-      <button
-        onClick={() => onDismiss(achievement.id)}
-        style={{ background: 'none', border: 'none', color: 'var(--pip-green-dark)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
-      >
-        ×
-      </button>
+      {/* Countdown ring */}
+      <svg width="20" height="20" viewBox="0 0 20 20" style={{ flexShrink: 0 }}>
+        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--glass-border)" strokeWidth="2" />
+        <circle
+          cx="10" cy="10" r="8" fill="none"
+          stroke="#34A853" strokeWidth="2"
+          strokeDasharray="50.3" strokeDashoffset="0"
+          style={{
+            animation: 'toastCountdown 4.7s linear forwards',
+            transformOrigin: 'center',
+            transform: 'rotate(-90deg)',
+          }}
+        />
+      </svg>
     </div>
   )
 }

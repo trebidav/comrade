@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { type Task, STATE_LABELS, formatMinutes } from '../api'
+import { type Task, formatMinutes } from '../api'
 import api from '../api'
+import BottomSheet from './BottomSheet'
+import { IconCamera } from './Icons'
 
 interface Props {
   task: Task
@@ -29,33 +31,19 @@ export default function ActiveTaskPanel({ task, coinsModifier, xpModifier, timeM
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [comment, setComment] = useState('')
   const [finishing, setFinishing] = useState(false)
-  const [showFinishPrompt, setShowFinishPrompt] = useState(false)
+  const [showSheet, setShowSheet] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Live timer — ticks every second, recomputes from server-side start time
   useEffect(() => {
     setElapsedMs(computeElapsedMs(task))
-    const interval = setInterval(() => {
-      setElapsedMs(computeElapsedMs(taskRef.current))
-    }, 1000)
+    const interval = setInterval(() => setElapsedMs(computeElapsedMs(taskRef.current)), 1000)
     return () => clearInterval(interval)
   }, [task.id, task.datetime_start, task.time_spent_minutes])
 
   const totalMinutes = elapsedMs / 60000
   const timeMultiplier = timeModifierMinutes > 0 ? totalMinutes / timeModifierMinutes : 1.0
   const criticalityFactor = 1.0 + ((task.criticality ?? 1) - 1) * criticalityPercentage
-
-  const canConfirm =
-    (!task.require_photo || photoFile !== null) &&
-    (!task.require_comment || comment.trim() !== '')
-
-  const handlePause = async () => {
-    await onAction('pause', task.id)
-  }
-
-  const handleAbandon = async () => {
-    await onAction('abandon', task.id)
-  }
+  const canConfirm = (!task.require_photo || photoFile !== null) && (!task.require_comment || comment.trim() !== '')
 
   const handleFinishConfirm = async () => {
     setFinishing(true)
@@ -63,237 +51,176 @@ export default function ActiveTaskPanel({ task, coinsModifier, xpModifier, timeM
       const form = new FormData()
       if (photoFile) form.append('photo', photoFile)
       form.append('comment', comment)
-      await api.post(`/task/${task.id}/finish`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      await api.post(`/task/${task.id}/finish`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
       onFinished(task.id, task.name)
+      setShowSheet(false)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
       console.error('Finish failed:', msg)
     } finally {
       setFinishing(false)
-      setShowFinishPrompt(false)
       setPhotoFile(null)
       setComment('')
     }
   }
 
   return (
-    <div
-      className="pip-panel"
-      style={{
-        position: 'absolute',
-        bottom: '16px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 1000,
-        minWidth: '280px',
-        maxWidth: '380px',
-        padding: '12px 16px',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          fontSize: '0.6rem',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--pip-green-dark)',
-          marginBottom: '6px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
+    <>
+      {/* Compact bar — tapping opens the full sheet */}
+      <div className="active-task-bar" onClick={() => setShowSheet(true)} style={{ cursor: 'pointer' }}>
         <span
           style={{
-            width: '6px',
-            height: '6px',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%',
-            background: '#FBBC05',
+            background: task.state === 3 ? '#e67e22' : '#FBBC05',
             display: 'inline-block',
-            animation: 'pip-blink 1.2s ease-in-out infinite',
+            flexShrink: 0,
+            animation: task.state === 3 ? undefined : 'pip-blink 1.2s ease-in-out infinite',
           }}
         />
-        Active Task
-      </div>
-
-      {/* Task name */}
-      <div
-        style={{
-          fontSize: '0.9rem',
-          fontWeight: 'bold',
-          color: 'var(--pip-text)',
-          marginBottom: '4px',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {task.name}
-      </div>
-
-      {task.description && (
-        <div style={{ fontSize: '0.7rem', color: 'rgba(51,214,136,0.7)', marginBottom: '6px' }}>
-          {task.description}
-        </div>
-      )}
-
-      {/* Time tracking row */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', alignItems: 'baseline' }}>
-        <div>
-          <span style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Elapsed </span>
-          <span style={{ fontSize: '0.85rem', color: '#FBBC05', fontWeight: 'bold' }}>{formatMinutes(totalMinutes)}</span>
-        </div>
-        {task.minutes != null && (
-          <div>
-            <span style={{ fontSize: '0.55rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Est. </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--pip-text)' }}>{formatMinutes(task.minutes)}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--pip-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {task.name}
           </div>
-        )}
+          <div style={{ fontSize: '0.65rem', color: task.state === 3 ? '#e67e22' : '#FBBC05' }}>
+            {task.state === 3 ? 'Waiting · Tap to resume' : `Active · ${formatMinutes(totalMinutes)} elapsed`}
+          </div>
+        </div>
+        <div style={{ fontSize: '0.7rem', color: 'var(--pip-green-dark)', flexShrink: 0, paddingLeft: '8px' }}>
+          Tap ›
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px', alignItems: 'center' }}>
-        <span
-          style={{
-            fontSize: '0.6rem',
-            padding: '1px 6px',
-            border: '1px solid #FBBC05',
-            color: '#FBBC05',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {STATE_LABELS[task.state ?? 2] ?? 'Unknown'}
-        </span>
-        {task.coins != null && (
-          <span style={{ fontSize: '0.6rem', padding: '1px 6px', border: '1px solid rgba(251,188,5,0.5)', color: '#FBBC05', borderRadius: '2px' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block', marginRight: '3px' }} />
-            {Math.round(task.coins * coinsModifier * timeMultiplier)}
-          </span>
-        )}
-        {task.xp != null && (
-          <span style={{ fontSize: '0.6rem', padding: '1px 6px', border: '1px solid rgba(66,133,244,0.5)', color: '#4285F4', borderRadius: '2px' }}>
-            {(() => {
-              const base = Math.round(task.xp * xpModifier * timeMultiplier)
-              const extra = Math.round(task.xp * xpModifier * timeMultiplier * criticalityFactor) - base
-              return <>XP: {base}{extra > 0 && <span style={{ color: '#89b4f8' }}>+{extra}</span>}</>
-            })()}
-          </span>
-        )}
-        {task.skill_execute_names.map((s) => (
-          <span
-            key={s}
-            style={{
-              fontSize: '0.55rem',
-              padding: '1px 5px',
-              background: 'rgba(52,168,83,0.15)',
-              border: '1px solid rgba(52,168,83,0.4)',
-              color: '#34A853',
-              borderRadius: '2px',
-            }}
-          >
-            {s}
-          </span>
-        ))}
-      </div>
+      {/* Full sheet for task details + actions */}
+      <BottomSheet open={showSheet} onClose={() => setShowSheet(false)} title="Active Task" height="auto">
+        <div style={{ padding: '16px' }}>
+          {/* Task info */}
+          <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '4px' }}>{task.name}</div>
+          {task.description && (
+            <div style={{ fontSize: '0.8rem', color: 'rgba(51,214,136,0.75)', marginBottom: '10px' }}>{task.description}</div>
+          )}
 
-      {/* Finish prompt */}
-      {showFinishPrompt && (
-        <div
-          style={{
-            marginBottom: '10px',
-            padding: '8px',
-            border: '1px solid var(--pip-border)',
-            background: 'rgba(46,194,126,0.05)',
-          }}
-        >
-          {/* Comment field */}
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--pip-green)', marginBottom: '4px' }}>
-              {task.require_comment ? 'Comment (required)' : 'Comment (optional)'}
+          {/* Time row */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', padding: '10px 12px', background: 'rgba(251,188,5,0.05)', border: '1px solid rgba(251,188,5,0.2)' }}>
+            <div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Elapsed</div>
+              <div style={{ fontSize: '1rem', color: '#FBBC05', fontWeight: 'bold' }}>{formatMinutes(totalMinutes)}</div>
             </div>
+            {task.minutes != null && (
+              <div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Est.</div>
+                <div style={{ fontSize: '1rem', color: 'var(--pip-text)' }}>{formatMinutes(task.minutes)}</div>
+              </div>
+            )}
+            {task.coins != null && (
+              <div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Coins</div>
+                <div style={{ fontSize: '1rem', color: '#FBBC05', fontWeight: 'bold' }}>
+                  {Math.round(task.coins * coinsModifier * timeMultiplier)}
+                </div>
+              </div>
+            )}
+            {task.xp != null && (
+              <div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>XP</div>
+                <div style={{ fontSize: '1rem', color: '#4285F4', fontWeight: 'bold' }}>
+                  {(() => {
+                    const base = Math.round(task.xp! * xpModifier * timeMultiplier)
+                    const extra = Math.round(task.xp! * xpModifier * timeMultiplier * criticalityFactor) - base
+                    return <>{base}{extra > 0 && <span style={{ color: '#89b4f8', fontSize: '0.8rem' }}>+{extra}</span>}</>
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Finish form */}
+          <div style={{ marginBottom: '14px' }}>
+            <div className="pip-label">{task.require_comment ? 'Comment (required)' : 'Comment (optional)'}</div>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={2}
               placeholder="Describe what was done..."
+              className="pip-input"
               style={{
-                width: '100%',
-                background: 'rgba(46,194,126,0.05)',
-                border: `1px solid ${task.require_comment && !comment.trim() ? '#EA4335' : 'var(--pip-border)'}`,
-                color: 'var(--pip-text)',
-                fontFamily: 'var(--pip-font)',
-                fontSize: '0.72rem',
-                padding: '5px 7px',
                 resize: 'none',
-                boxSizing: 'border-box',
-                outline: 'none',
+                border: `1px solid ${task.require_comment && !comment.trim() ? '#EA4335' : 'var(--pip-border)'}`,
               }}
             />
           </div>
 
-          {/* Photo field */}
-          <div style={{ fontSize: '0.7rem', color: 'var(--pip-green)', marginBottom: '6px' }}>
-            {task.require_photo ? 'Photo (required)' : 'Photo (optional)'}
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-            style={{ display: 'none' }}
-          />
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button className="pip-popup-btn" onClick={() => fileInputRef.current?.click()}>
+          <div style={{ marginBottom: '18px' }}>
+            <div className="pip-label">{task.require_photo ? 'Photo (required)' : 'Photo (optional)'}</div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              style={{ display: 'none' }}
+            />
+            <button
+              className="pip-btn"
+              onClick={() => fileInputRef.current?.click()}
+              style={{ width: '100%', fontSize: '0.8rem', gap: '8px' }}
+            >
+              <IconCamera size={18} />
               {photoFile ? photoFile.name : 'Choose Photo'}
             </button>
-            <button
-              className="pip-popup-btn pip-popup-btn-primary"
-              onClick={handleFinishConfirm}
-              disabled={finishing || !canConfirm}
-            >
-              {finishing ? 'Finishing...' : 'Confirm Finish'}
-            </button>
-            <button
-              className="pip-popup-btn"
-              onClick={() => { setShowFinishPrompt(false); setPhotoFile(null); setComment('') }}
-              disabled={finishing}
-            >
-              Cancel
-            </button>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {task.state === 3 ? (
+              <button
+                className="pip-btn pip-btn-primary"
+                onClick={() => { onAction('resume', task.id); setShowSheet(false) }}
+                style={{ width: '100%', fontSize: '0.9rem' }}
+              >
+                Resume Task
+              </button>
+            ) : (
+              <button
+                className="pip-btn pip-btn-primary"
+                onClick={handleFinishConfirm}
+                disabled={finishing || !canConfirm}
+                style={{ width: '100%', fontSize: '0.9rem' }}
+              >
+                {finishing ? 'Finishing...' : 'Finish Task'}
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {task.state !== 3 && (
+                <button
+                  className="pip-btn"
+                  onClick={() => { onAction('pause', task.id); setShowSheet(false) }}
+                  style={{ flex: 1 }}
+                >
+                  Pause
+                </button>
+              )}
+              {task.lat != null && task.lon != null && (
+                <button
+                  className="pip-btn"
+                  onClick={() => { onLocate(task); setShowSheet(false) }}
+                  style={{ flex: 1 }}
+                >
+                  Locate
+                </button>
+              )}
+              <button
+                className="pip-btn"
+                style={{ flex: 1, borderColor: '#EA4335', color: '#EA4335' }}
+                onClick={() => { onAction('abandon', task.id); setShowSheet(false) }}
+              >
+                Abandon
+              </button>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Actions */}
-      {!showFinishPrompt && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button className="pip-popup-btn pip-popup-btn-primary" onClick={() => setShowFinishPrompt(true)}>
-            Finish
-          </button>
-          <button className="pip-popup-btn" onClick={handlePause}>
-            Pause
-          </button>
-          <button
-            className="pip-popup-btn"
-            style={{ borderColor: '#EA4335', color: '#EA4335' }}
-            onClick={handleAbandon}
-          >
-            Abandon
-          </button>
-          {task.lat != null && task.lon != null && (
-            <button
-              className="pip-popup-btn"
-              style={{ marginLeft: 'auto' }}
-              onClick={() => onLocate(task)}
-            >
-              Locate
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+      </BottomSheet>
+    </>
   )
 }

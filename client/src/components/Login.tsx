@@ -56,18 +56,81 @@ export default function Login({ onLogin }: Props) {
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-2">Comrade</h1>
-        <p className="text-center text-gray-500 text-sm mb-6">Community task manager</p>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100dvh',
+      background: 'var(--pip-bg)',
+      padding: '24px 20px',
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 40px)',
+    }}>
+      {/* Logo / header */}
+      <div className="login-logo-enter" style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <div style={{
+          fontSize: '2.2rem',
+          fontWeight: 'bold',
+          color: 'var(--pip-green)',
+          fontFamily: 'var(--pip-font)',
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          animation: 'glowPulse 3s ease-in-out infinite',
+        }}>
+          COMRADE
+        </div>
+        <div style={{
+          fontSize: '0.7rem',
+          color: 'var(--pip-green-dark)',
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          marginTop: '8px',
+          animation: 'fadeInDown 0.5s ease-out 0.3s both',
+        }}>
+          Community Task Manager
+        </div>
+      </div>
 
+      {/* Card */}
+      <div
+        className="pip-glass login-card-enter"
+        style={{
+          width: '100%',
+          maxWidth: '360px',
+          padding: '28px 24px',
+          borderRadius: '16px',
+        }}
+      >
         {googleClientId && (
           <>
             <button
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 mb-4"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                border: '1px solid var(--pip-border)',
+                background: 'transparent',
+                color: 'var(--pip-text)',
+                fontFamily: 'var(--pip-font)',
+                fontSize: '0.85rem',
+                padding: '14px 20px',
+                cursor: 'pointer',
+                marginBottom: '20px',
+                minHeight: '52px',
+                letterSpacing: '0.05em',
+                touchAction: 'manipulation',
+                borderRadius: '8px',
+                transition: 'transform 0.12s var(--spring), background 0.15s',
+              }}
+              onPointerDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+              onPointerUp={(e) => (e.currentTarget.style.transform = '')}
+              onPointerLeave={(e) => (e.currentTarget.style.transform = '')}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -75,43 +138,72 @@ export default function Login({ onLogin }: Props) {
               </svg>
               Sign in with Google
             </button>
-            <div className="flex items-center gap-3 mb-4">
-              <hr className="flex-1 border-gray-200" />
-              <span className="text-xs text-gray-400">or</span>
-              <hr className="flex-1 border-gray-200" />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+              <span style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>or</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
             </div>
           </>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label className="pip-label">Username</label>
+            <input
+              type="text"
+              autoComplete="username"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="pip-input"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="pip-label">Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pip-input"
+              required
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              color: '#EA4335',
+              fontSize: '0.8rem',
+              textAlign: 'center',
+              border: '1px solid rgba(234,67,53,0.4)',
+              padding: '10px',
+              background: 'rgba(234,67,53,0.08)',
+              borderRadius: '6px',
+              animation: 'fadeInDown 0.2s ease-out both',
+            }}>
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-600 text-white rounded-lg py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
+            className={`pip-btn pip-btn-primary${loading ? ' pip-btn-loading' : ''}`}
+            style={{ width: '100%', fontSize: '0.85rem', letterSpacing: '0.1em', minHeight: '52px', borderRadius: '8px' }}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? '' : 'Sign In'}
           </button>
         </form>
-        <p className="text-center text-gray-400 text-xs mt-4">
-          Dev: david / david (task owner) · worker / worker (executor)
-        </p>
+
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', letterSpacing: '0.08em' }}>
+            Dev: david / david · worker / worker
+          </div>
+        </div>
       </div>
     </div>
   )

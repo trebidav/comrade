@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
+import BottomSheet from './BottomSheet'
 
 interface PendingRequest {
   id: number
@@ -8,11 +9,12 @@ interface PendingRequest {
 }
 
 interface Props {
+  open: boolean
   onClose: () => void
   onBadgeUpdate: (count: number) => void
 }
 
-export default function FriendRequestsModal({ onClose, onBadgeUpdate }: Props) {
+export default function FriendRequestsModal({ open, onClose, onBadgeUpdate }: Props) {
   const [requests, setRequests] = useState<PendingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,10 +33,11 @@ export default function FriendRequestsModal({ onClose, onBadgeUpdate }: Props) {
   }, [onBadgeUpdate])
 
   useEffect(() => {
+    if (!open) return
     fetchPending()
     const interval = setInterval(fetchPending, 30000)
     return () => clearInterval(interval)
-  }, [fetchPending])
+  }, [fetchPending, open])
 
   const handleAccept = async (id: number) => {
     try {
@@ -55,84 +58,61 @@ export default function FriendRequestsModal({ onClose, onBadgeUpdate }: Props) {
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.7)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="pip-panel" style={{ width: '360px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--pip-border)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Friend Requests
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--pip-text)',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <BottomSheet open={open} onClose={onClose} title="Friend Requests" height="full">
+      <div style={{ padding: '12px 16px' }}>
+        {error && (
+          <div style={{ color: '#EA4335', fontSize: '0.8rem', marginBottom: '12px', padding: '8px', border: '1px solid rgba(234,67,53,0.4)', background: 'rgba(234,67,53,0.08)' }}>
+            {error}
+          </div>
+        )}
 
-        {/* Content */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px' }}>
-          {error && (
-            <div style={{ color: '#EA4335', fontSize: '0.75rem', marginBottom: '8px' }}>{error}</div>
-          )}
-          {loading ? (
-            <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)' }}>Loading...</div>
-          ) : requests.length === 0 ? (
-            <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)', textAlign: 'center', padding: '20px 0' }}>
-              No pending requests
-            </div>
-          ) : (
-            requests.map((req) => (
+        {loading ? (
+          <div style={{ fontSize: '0.8rem', color: 'var(--pip-green-dark)', padding: '20px 0', textAlign: 'center' }}>
+            Loading...
+          </div>
+        ) : requests.length === 0 ? (
+          <div style={{ fontSize: '0.85rem', color: 'var(--pip-green-dark)', textAlign: 'center', padding: '32px 0' }}>
+            No pending requests
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {requests.map((req) => (
               <div
                 key={req.id}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 0',
+                  padding: '14px 0',
                   borderBottom: '1px solid rgba(26, 115, 70, 0.3)',
+                  gap: '12px',
                 }}
               >
-                <span style={{ fontSize: '0.8rem' }}>{req.username}</span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button className="pip-btn pip-btn-primary" onClick={() => handleAccept(req.id)}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--pip-text)' }}>{req.username}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--pip-green-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{req.email}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    className="pip-btn pip-btn-primary"
+                    onClick={() => handleAccept(req.id)}
+                    style={{ padding: '8px 16px', fontSize: '0.75rem', minHeight: '40px' }}
+                  >
                     Accept
                   </button>
-                  <button className="pip-btn" onClick={() => handleReject(req.id)}>
+                  <button
+                    className="pip-btn"
+                    onClick={() => handleReject(req.id)}
+                    style={{ padding: '8px 12px', fontSize: '0.75rem', minHeight: '40px' }}
+                  >
                     Reject
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </BottomSheet>
   )
 }

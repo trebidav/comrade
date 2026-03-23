@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api from '../api'
+import BottomSheet from './BottomSheet'
 
 interface Props {
   taskId: number
@@ -10,17 +11,15 @@ interface Props {
 
 function RatingSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div>
-      <input
-        type="range"
-        className="rating-slider"
-        min={0}
-        max={2}
-        step={0.01}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-    </div>
+    <input
+      type="range"
+      className="rating-slider"
+      min={0}
+      max={2}
+      step={0.01}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+    />
   )
 }
 
@@ -35,111 +34,64 @@ export default function RatingModal({ taskId, taskName, requireComment, onClose 
     try {
       await api.post(`/task/${taskId}/rate`, { happiness, time, feedback })
     } catch {
-      // best effort — don't block user on rating failure
+      // best effort
     }
     onClose()
   }
 
+  const canSubmit = !requireComment || feedback.trim().length > 0
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.6)',
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="pip-panel"
-        style={{ width: '320px', padding: '20px 24px' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div
-          style={{
-            fontSize: '0.6rem',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--pip-green-dark)',
-            marginBottom: '4px',
-          }}
-        >
-          Task complete
+    <BottomSheet open={true} onClose={onClose} title="Rate Task" height="auto">
+      <div style={{ padding: '20px 16px' }}>
+        <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
+          Task Complete
         </div>
-        <div
-          style={{
-            fontSize: '1rem',
-            fontWeight: 'bold',
-            color: 'var(--pip-text)',
-            marginBottom: '18px',
-            borderBottom: '1px solid var(--pip-border)',
-            paddingBottom: '10px',
-          }}
-        >
+        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '20px', borderBottom: '1px solid var(--pip-border)', paddingBottom: '12px' }}>
           {taskName}
         </div>
 
-        {/* Happiness */}
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--pip-green)', marginBottom: '6px' }}>
-            How was the experience?
-          </div>
+        <div style={{ marginBottom: '20px' }}>
+          <div className="pip-label">How was the experience?</div>
           <RatingSlider value={happiness} onChange={setHappiness} />
         </div>
 
-        {/* Time accuracy */}
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--pip-green)', marginBottom: '6px' }}>
-            Was the time estimate accurate?
-          </div>
+        <div style={{ marginBottom: '20px' }}>
+          <div className="pip-label">Was the time estimate accurate?</div>
           <RatingSlider value={time} onChange={setTime} />
         </div>
 
-        {/* Feedback text */}
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--pip-green)', marginBottom: '6px' }}>
-            {requireComment ? 'Comment (required)' : 'Feedback (optional)'}
-          </div>
+        <div style={{ marginBottom: '24px' }}>
+          <div className="pip-label">{requireComment ? 'Comment (required)' : 'Feedback (optional)'}</div>
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={3}
             placeholder="Any comments about this task..."
+            className="pip-input"
             style={{
-              width: '100%',
-              background: 'rgba(46,194,126,0.05)',
+              resize: 'none',
               border: `1px solid ${requireComment && !feedback.trim() ? '#EA4335' : 'var(--pip-border)'}`,
-              color: 'var(--pip-text)',
-              fontFamily: 'var(--pip-font)',
-              fontSize: '0.75rem',
-              padding: '6px 8px',
-              resize: 'vertical',
-              boxSizing: 'border-box',
-              outline: 'none',
             }}
           />
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           {!requireComment && (
-            <button className="pip-popup-btn" onClick={onClose} disabled={submitting}>
+            <button className="pip-btn" onClick={onClose} disabled={submitting} style={{ flex: 1 }}>
               Skip
             </button>
           )}
           <button
-            className="pip-popup-btn pip-popup-btn-primary"
+            className="pip-btn pip-btn-primary"
             onClick={handleSubmit}
-            disabled={submitting || (requireComment && !feedback.trim())}
+            disabled={submitting || !canSubmit}
+            style={{ flex: 2 }}
           >
             {submitting ? 'Saving...' : 'Submit'}
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
