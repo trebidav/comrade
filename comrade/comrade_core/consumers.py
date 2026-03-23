@@ -223,7 +223,8 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'accuracy': event['accuracy'],
             'timestamp': event['timestamp'],
             'friends': event['friends'],
-            'skills': event['skills']
+            'skills': event['skills'],
+            'profile_picture': event.get('profile_picture', ''),
         }))
 
     async def public_location(self, event):
