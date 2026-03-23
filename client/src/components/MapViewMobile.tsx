@@ -153,16 +153,7 @@ function taskIcon(
   const isMyTask = task.assignee === currentUserId
   const isTutorialActive = task.is_tutorial && !!task.in_progress
 
-  // My active task (tutorial in-progress) — spinner
-  if (isTutorialActive) {
-    return L.divIcon({
-      className: '',
-      html: `<svg class="task-marker-svg-spin" width="30" height="30" viewBox="0 0 30 30" fill="none" style="${PIN_SHADOW}"><circle cx="15" cy="15" r="11" stroke="rgba(66,133,244,0.25)" stroke-width="2.5"/><path d="M15 4 A11 11 0 1 1 4 15" stroke="#4285F4" stroke-width="2.5" stroke-linecap="round"/></svg>`,
-      iconSize: [30, 30], iconAnchor: [15, 15],
-    })
-  }
-
-  // Tutorial available — book icon
+  // Tutorial (available or in-progress) — blue book
   if (task.is_tutorial) {
     return L.divIcon({
       className: '',

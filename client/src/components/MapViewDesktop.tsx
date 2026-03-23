@@ -88,6 +88,32 @@ function CenterOnMeListener() {
   return null
 }
 
+// ── WoW-style quest marker factory ──────────────────────────────────────────
+const PIN_SHADOW = "filter:drop-shadow(0 2px 5px rgba(0,0,0,0.55))"
+
+function makePin(symbol: 'exclaim' | 'question' | 'book', fill: string): string {
+  const pinPath = "M14 1.5C7.1 1.5 1.5 7.1 1.5 14c0 4.9 2.6 9.2 6.5 11.6L14 38l6-12.4C23.9 23.2 26.5 18.9 26.5 14 26.5 7.1 20.9 1.5 14 1.5z"
+  const strokeColor = "rgba(255,255,255,0.88)"
+
+  let inner = ''
+  if (symbol === 'exclaim') {
+    inner = `<rect x="11.5" y="8" width="5" height="11" rx="2.5" fill="white"/><rect x="11.5" y="22" width="5" height="5" rx="2.5" fill="white"/>`
+  } else if (symbol === 'question') {
+    inner = `<text x="14" y="24" text-anchor="middle" fill="white" font-family="Georgia,'Times New Roman',serif" font-size="17" font-weight="900">?</text>`
+  } else {
+    inner = `<g transform="translate(5.5,9)">
+      <line x1="8.5" y1="0" x2="8.5" y2="14" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M8.5 0C6 0 2 1 0 3.5v11c2-2.5 6-3 8.5-3" stroke="white" stroke-width="1.5" fill="rgba(255,255,255,0.15)" stroke-linejoin="round"/>
+      <path d="M8.5 0C11 0 15 1 17 3.5v11c-2-2.5-6-3-8.5-3" stroke="white" stroke-width="1.5" fill="rgba(255,255,255,0.15)" stroke-linejoin="round"/>
+    </g>`
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40" style="${PIN_SHADOW}">
+    <path d="${pinPath}" fill="${fill}" stroke="${strokeColor}" stroke-width="1.5"/>
+    ${inner}
+  </svg>`
+}
+
 function taskIcon(
   task: Task,
   currentUserId: number,
@@ -98,34 +124,43 @@ function taskIcon(
   const isMyTask = task.assignee === currentUserId
   const isTutorialActive = task.is_tutorial && !!task.in_progress
 
-  if ((isMyTask && task.state === 2) || isTutorialActive) {
-    return L.divIcon({ className: '', html: '<svg class="task-marker-svg-spin" width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10" stroke="rgba(251,188,5,0.2)" stroke-width="2.5"/><path d="M13 3 A10 10 0 1 1 3 13" stroke="#FBBC05" stroke-width="2.5" stroke-linecap="round"/></svg>', iconSize: [26, 26], iconAnchor: [13, 13] })
+  // Tutorial (available or in-progress) — blue book
+  if (task.is_tutorial) {
+    return L.divIcon({ className: '', html: makePin('book', '#4285F4'), iconSize: [28, 40], iconAnchor: [14, 39] })
   }
+
+  // My active task — yellow ?
+  if (isMyTask && task.state === 2) {
+    return L.divIcon({ className: '', html: makePin('question', '#FBBC05'), iconSize: [28, 40], iconAnchor: [14, 39] })
+  }
+
+  // My paused task — grey ?
   if (isMyTask && task.state === 3) {
-    return L.divIcon({ className: '', html: '<div class="task-marker-stopwatch">⏱</div>', iconSize: [28, 28], iconAnchor: [14, 14] })
+    return L.divIcon({ className: '', html: makePin('question', '#777'), iconSize: [28, 40], iconAnchor: [14, 39] })
   }
 
-  if (task.is_tutorial && !isTutorialActive) {
-    return L.divIcon({ className: '', html: '<div class="task-marker-dot" style="background:#FBBC05"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
-  }
-
-  const isOpen = task.state === 1
-  if (isOpen) {
+  // Open task
+  if (task.state === 1) {
     const hasSkill = task.skill_execute_names.length === 0 ||
       task.skill_execute_names.some((s) => currentUserSkills.includes(s))
     if (!hasSkill) {
-      return L.divIcon({ className: '', html: '<div class="task-marker-dot" style="background:#EA4335"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
+      return L.divIcon({ className: '', html: makePin('exclaim', '#777'), iconSize: [28, 40], iconAnchor: [14, 39] })
     }
     const distKm = selfLocation && task.lat != null && task.lon != null
       ? haversineKm(selfLocation.lat, selfLocation.lon, task.lat, task.lon) : null
     const outOfReach = distKm !== null && distKm > proximityKm
     if (outOfReach) {
-      return L.divIcon({ className: '', html: '<div class="task-marker-dot" style="background:#888;opacity:0.7"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
+      return L.divIcon({ className: '', html: makePin('exclaim', '#b8860b'), iconSize: [28, 40], iconAnchor: [14, 39] })
     }
-    return L.divIcon({ className: '', html: '<div class="task-marker-dot" style="background:#34A853"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
+    return L.divIcon({ className: '', html: makePin('exclaim', '#FBBC05'), iconSize: [28, 40], iconAnchor: [14, 39] })
   }
 
-  return L.divIcon({ className: '', html: '<div class="task-marker-dot" style="background:#666;opacity:0.5"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
+  // Unavailable / done — tiny grey dot
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#555;border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7],
+  })
 }
 
 interface Props {
