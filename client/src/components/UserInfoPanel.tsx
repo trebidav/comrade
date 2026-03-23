@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { type User } from '../api'
+import { type FriendEvent } from '../hooks/useLocationSocket'
 import FriendRequestsModal from './FriendRequestsModal'
 import AccountModal from './AccountModal'
 import AchievementsPanel from './AchievementsPanel'
@@ -9,9 +10,12 @@ import { IconFriends, IconTrophy, IconSettings, IconLogout } from './Icons'
 interface Props {
   user: User
   onLogout: () => void
+  onlineFriendIds: Set<number>
+  friendEvents: FriendEvent[]
+  clearFriendEvents: () => void
 }
 
-export default function UserInfoPanel({ user, onLogout }: Props) {
+export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents }: Props) {
   const [showFriendRequests, setShowFriendRequests] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
@@ -22,6 +26,7 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
   const levelPct = lp.required_xp > 0 ? Math.min(100, (lp.current_xp / lp.required_xp) * 100) : 0
   const initial = (user.username?.[0] ?? '?').toUpperCase()
 
+  // Fetch initial badge count on mount
   useEffect(() => {
     const fetchCount = async () => {
       try {
@@ -37,13 +42,22 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
       } catch { /* ignore */ }
     }
     fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => clearInterval(interval)
   }, [])
+
+  // Increment badge count from WebSocket friend_request_received events
+  useEffect(() => {
+    if (friendEvents.length === 0) return
+    const newRequestCount = friendEvents.filter(
+      (evt) => evt.type === 'friend_request_received'
+    ).length
+    if (newRequestCount > 0) {
+      setFriendRequestCount((prev) => prev + newRequestCount)
+    }
+  }, [friendEvents])
 
   const menuItems = [
     {
-      label: 'Friend Requests',
+      label: 'Friends',
       icon: <IconFriends size={20} />,
       badge: friendRequestCount,
       onClick: () => { haptics.light(); setShowFriendRequests(true) },
@@ -180,6 +194,9 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
         open={showFriendRequests}
         onClose={() => setShowFriendRequests(false)}
         onBadgeUpdate={setFriendRequestCount}
+        onlineFriendIds={onlineFriendIds}
+        friendEvents={friendEvents}
+        clearFriendEvents={clearFriendEvents}
       />
       <AccountModal
         open={showAccount}

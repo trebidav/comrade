@@ -199,7 +199,11 @@ export default function MapView({ user, onLogout }: Props) {
     return () => window.removeEventListener('comrade-theme-change', onThemeChange)
   }, [])
 
-  const { friends, publicUsers, chatMessages, selfLocation, sendChatMessage } = useLocationSocket({
+  const {
+    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    taskUpdates, clearTaskUpdates, userStats, clearUserStats,
+    wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
+  } = useLocationSocket({
     token,
     username: user.username,
     userId: user.id,
@@ -220,6 +224,48 @@ export default function MapView({ user, onLogout }: Props) {
       setCurrentUser(res.data)
     } catch {}
   }, [])
+
+  // ── Live task updates from WebSocket ──
+  useEffect(() => {
+    if (taskUpdates.length === 0) return
+    setTasks((prev) => {
+      const updated = [...prev]
+      for (const evt of taskUpdates) {
+        const idx = updated.findIndex((t) => t.id === evt.task_id)
+        if (idx >= 0) {
+          updated[idx] = {
+            ...updated[idx],
+            state: evt.state,
+            assignee: evt.assignee,
+            assignee_name: evt.assignee_name,
+            datetime_start: evt.datetime_start,
+            datetime_finish: evt.datetime_finish,
+            datetime_paused: evt.datetime_paused,
+          }
+        }
+      }
+      return updated
+    })
+    const needsRefetch = taskUpdates.some((e) =>
+      ['decline_review', 'accept_review', 'abandon', 'debug_reset'].includes(e.action)
+    )
+    if (needsRefetch) fetchTasks()
+    clearTaskUpdates()
+  }, [taskUpdates, clearTaskUpdates, fetchTasks])
+
+  // ── Live user stats from WebSocket ──
+  useEffect(() => {
+    if (!userStats) return
+    setCurrentUser((prev) => ({ ...prev, ...userStats }))
+    clearUserStats()
+  }, [userStats, clearUserStats])
+
+  // ── Live achievements from WebSocket ──
+  useEffect(() => {
+    if (wsAchievements.length === 0) return
+    setAchievementToasts((prev) => [...prev, ...wsAchievements])
+    clearWsAchievements()
+  }, [wsAchievements, clearWsAchievements])
 
   useEffect(() => {
     fetchTasks()
@@ -519,7 +565,7 @@ export default function MapView({ user, onLogout }: Props) {
           />
 
           {/* User info panel - top right */}
-          <UserInfoPanel user={currentUser} onLogout={onLogout} />
+          <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} />
 
           {/* Chat - bottom left */}
           <Chat messages={chatMessages} onSend={sendChatMessage} />

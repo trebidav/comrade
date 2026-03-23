@@ -31,6 +31,43 @@ export interface ChatMessage {
   isSelf: boolean
 }
 
+// ── New real-time event interfaces ──
+
+export interface TaskUpdateEvent {
+  task_id: number
+  state: number
+  assignee: number | null
+  assignee_name: string | null
+  owner: number | null
+  datetime_start: string | null
+  datetime_finish: string | null
+  datetime_paused: string | null
+  action: string
+}
+
+export interface UserStatsEvent {
+  coins: number
+  xp: number
+  total_coins_earned: number
+  total_xp_earned: number
+  task_streak: number
+  level: number
+  level_progress: { level: number; current_xp: number; required_xp: number }
+}
+
+export interface WsAchievement {
+  id: number
+  name: string
+  icon: string
+  description: string
+}
+
+export type FriendEvent =
+  | { type: 'friend_request_received'; from_user: { id: number; username: string } }
+  | { type: 'friend_request_accepted'; user: { id: number; username: string } }
+  | { type: 'friend_request_rejected'; user_id: number }
+  | { type: 'friend_removed'; user_id: number }
+
 interface Props {
   token: string | null
   username: string
@@ -47,6 +84,13 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [publicUsers, setPublicUsers] = useState<Map<number, PublicLocation>>(new Map())
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
+
+  // New real-time state
+  const [taskUpdates, setTaskUpdates] = useState<TaskUpdateEvent[]>([])
+  const [userStats, setUserStats] = useState<UserStatsEvent | null>(null)
+  const [wsAchievements, setWsAchievements] = useState<WsAchievement[]>([])
+  const [friendEvents, setFriendEvents] = useState<FriendEvent[]>([])
+  const [onlineFriendIds, setOnlineFriendIds] = useState<Set<number>>(new Set())
 
   const sendLocation = useCallback(
     (lat: number, lon: number, accuracy: number) => {
@@ -84,6 +128,12 @@ export function useLocationSocket({ token, username, userId }: Props) {
     },
     [username]
   )
+
+  // Consume task updates (called by MapView after processing)
+  const clearTaskUpdates = useCallback(() => setTaskUpdates([]), [])
+  const clearUserStats = useCallback(() => setUserStats(null), [])
+  const clearWsAchievements = useCallback(() => setWsAchievements([]), [])
+  const clearFriendEvents = useCallback(() => setFriendEvents([]), [])
 
   useEffect(() => {
     if (!token) return
@@ -124,7 +174,6 @@ export function useLocationSocket({ token, username, userId }: Props) {
 
         switch (data.type) {
           case 'location_update':
-            // Own location echo — update self location if provided
             if (data.latitude && data.longitude) {
               setSelfLocation({
                 lat: data.latitude,
@@ -148,6 +197,12 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 friends: data.friends ?? [],
                 skills: data.skills ?? [],
               })
+              return next
+            })
+            // Friend sending location = they're online
+            setOnlineFriendIds((prev) => {
+              const next = new Set(prev)
+              next.add(uid)
               return next
             })
             break
@@ -183,11 +238,27 @@ export function useLocationSocket({ token, username, userId }: Props) {
               next.delete(uid)
               return next
             })
+            setOnlineFriendIds((prev) => {
+              const next = new Set(prev)
+              next.delete(uid)
+              return next
+            })
+            break
+          }
+
+          case 'friend_online': {
+            const uid = data.userId
+            if (uid != null) {
+              setOnlineFriendIds((prev) => {
+                const next = new Set(prev)
+                next.add(uid)
+                return next
+              })
+            }
             break
           }
 
           case 'heartbeat_response':
-            // ignore
             break
 
           case 'chat_message': {
@@ -200,6 +271,39 @@ export function useLocationSocket({ token, username, userId }: Props) {
             }
             break
           }
+
+          // ── New real-time events ──
+
+          case 'task_update':
+            setTaskUpdates((prev) => [...prev, data as TaskUpdateEvent])
+            break
+
+          case 'user_stats_update':
+            setUserStats(data as UserStatsEvent)
+            break
+
+          case 'achievement_earned':
+            if (data.achievements?.length) {
+              setWsAchievements((prev) => [...prev, ...data.achievements])
+            }
+            break
+
+          case 'friend_request_received':
+          case 'friend_request_accepted':
+          case 'friend_request_rejected':
+          case 'friend_removed':
+            setFriendEvents((prev) => [...prev, data as FriendEvent])
+            break
+
+          case 'friend_details':
+            // Handle the existing friend_details event (sent on friend accept)
+            if (data.userId != null) {
+              setFriendEvents((prev) => [...prev, {
+                type: 'friend_request_accepted' as const,
+                user: { id: data.userId, username: data.name ?? '' },
+              }])
+            }
+            break
 
           default:
             break
@@ -221,5 +325,13 @@ export function useLocationSocket({ token, username, userId }: Props) {
     }
   }, [token, sendLocation, username, userId])
 
-  return { friends, publicUsers, chatMessages, selfLocation, sendChatMessage }
+  return {
+    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    // New real-time data
+    taskUpdates, clearTaskUpdates,
+    userStats, clearUserStats,
+    wsAchievements, clearWsAchievements,
+    friendEvents, clearFriendEvents,
+    onlineFriendIds,
+  }
 }

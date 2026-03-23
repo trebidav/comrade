@@ -23,6 +23,16 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
                 await self.accept()
+
+                # Notify friends that this user came online
+                friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+                online_msg = {
+                    'type': 'friend_online',
+                    'userId': self.user.id,
+                    'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+                }
+                for friend in friends:
+                    await self.channel_layer.group_send(f"location_{friend.id}", online_msg)
             else:
                 await self.close()
         except Token.DoesNotExist:
@@ -273,6 +283,32 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
             'sender': event['sender']
         }))
+
+    # ── Real-time event handlers (forwarded from ws_events.py) ──
+
+    async def task_update(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def user_stats_update(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def achievement_earned(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def friend_request_received(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def friend_request_accepted(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def friend_request_rejected(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def friend_removed(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def friend_online(self, event):
+        await self.send(text_data=json.dumps(event))
 
 from urllib.parse import parse_qs
 from asgiref.sync import sync_to_async

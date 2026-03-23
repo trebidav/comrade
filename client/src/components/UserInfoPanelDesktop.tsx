@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { type User } from '../api'
+import { type FriendEvent } from '../hooks/useLocationSocket'
 import FriendRequestsModal from './FriendRequestsModalDesktop'
 import AccountModal from './AccountModalDesktop'
 import AchievementsPanel from './AchievementsPanelDesktop'
@@ -7,9 +8,12 @@ import AchievementsPanel from './AchievementsPanelDesktop'
 interface Props {
   user: User
   onLogout: () => void
+  onlineFriendIds: Set<number>
+  friendEvents: FriendEvent[]
+  clearFriendEvents: () => void
 }
 
-export default function UserInfoPanel({ user, onLogout }: Props) {
+export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendEvents, clearFriendEvents }: Props) {
   const [showFriendRequests, setShowFriendRequests] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
@@ -18,7 +22,7 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
   const lp = user.level_progress ?? { level: user.level ?? 0, current_xp: 0, required_xp: 1000 }
   const levelPct = lp.required_xp > 0 ? Math.min(100, (lp.current_xp / lp.required_xp) * 100) : 0
 
-  // Poll friend requests count in background even when modal is closed
+  // Fetch initial badge count on mount
   useEffect(() => {
     const fetchCount = async () => {
       try {
@@ -36,9 +40,18 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
       }
     }
     fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => clearInterval(interval)
   }, [])
+
+  // Increment badge count from WebSocket friend_request_received events
+  useEffect(() => {
+    if (friendEvents.length === 0) return
+    const newRequestCount = friendEvents.filter(
+      (evt) => evt.type === 'friend_request_received'
+    ).length
+    if (newRequestCount > 0) {
+      setFriendRequestCount((prev) => prev + newRequestCount)
+    }
+  }, [friendEvents])
 
   return (
     <>
@@ -117,7 +130,7 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
             onClick={() => setShowFriendRequests(true)}
             style={{ position: 'relative', textAlign: 'center', whiteSpace: 'nowrap', width: '100%' }}
           >
-            Friend Requests
+            Friends
             {friendRequestCount > 0 && (
               <span
                 style={{
@@ -163,6 +176,9 @@ export default function UserInfoPanel({ user, onLogout }: Props) {
         open={showFriendRequests}
         onClose={() => setShowFriendRequests(false)}
         onBadgeUpdate={setFriendRequestCount}
+        onlineFriendIds={onlineFriendIds}
+        friendEvents={friendEvents}
+        clearFriendEvents={clearFriendEvents}
       />
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
       <AchievementsPanel open={showAchievements} onClose={() => setShowAchievements(false)} />

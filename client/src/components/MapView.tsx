@@ -254,7 +254,10 @@ export default function MapView({ user, onLogout }: Props) {
     return () => window.removeEventListener('comrade-theme-change', onThemeChange)
   }, [])
 
-  const { friends, publicUsers, chatMessages, selfLocation, sendChatMessage } = useLocationSocket({
+  const {
+    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    friendEvents, clearFriendEvents, onlineFriendIds,
+  } = useLocationSocket({
     token,
     username: user.username,
     userId: user.id,
@@ -640,7 +643,7 @@ export default function MapView({ user, onLogout }: Props) {
         title="Profile"
         height="full"
       >
-        <UserInfoPanel user={currentUser} onLogout={onLogout} />
+        <UserInfoPanel user={currentUser} onLogout={onLogout} onlineFriendIds={onlineFriendIds} friendEvents={friendEvents} clearFriendEvents={clearFriendEvents} />
       </BottomSheet>
 
       {/* Task detail sheet (tapping marker on map) */}

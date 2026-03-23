@@ -18,6 +18,7 @@ from django.contrib.auth import get_user_model
 from .serializers import UserDetailSerializer, TaskSerializer, SkillSerializer, TutorialTaskDetailSerializer, TutorialTaskFlatSerializer
 
 from django.core.exceptions import ValidationError
+from .ws_events import send_task_update, send_user_stats, send_achievements, send_friend_event
 from django.utils.timezone import now
 from .models import User, Rating, Review, Skill, LocationConfig, haversine_km, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress, Achievement, UserAchievement
 
@@ -134,6 +135,7 @@ class TaskStartView(APIView):
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
+        send_task_update(task, action='start', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task started!"},
             status=status.HTTP_200_OK,
@@ -166,6 +168,7 @@ class TaskFinishView(APIView):
             review.photo = photo
         review.save()
 
+        send_task_update(task, action='finish', exclude_user_id=request.user.id)
         return Response({"message": "Task finished!"}, status=status.HTTP_200_OK)
 
 
@@ -190,6 +193,7 @@ class TaskRateView(APIView):
             feedback=feedback,
         )
         new_achievements = request.user.check_and_award_achievements()
+        send_achievements(request.user.id, new_achievements)
         return Response({"message": "Rating saved!", "new_achievements": _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
 
 class TaskPauseView(APIView):
@@ -207,6 +211,7 @@ class TaskPauseView(APIView):
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
+        send_task_update(task, action='pause', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task paused!"},
             status=status.HTTP_200_OK,
@@ -236,6 +241,7 @@ class TaskResumeView(APIView):
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
+        send_task_update(task, action='resume', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task resumed!"},
             status=status.HTTP_200_OK,
@@ -288,6 +294,7 @@ class TaskAbandonView(APIView):
             task.abandon(request.user)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        send_task_update(task, action='abandon', exclude_user_id=request.user.id)
         return Response({"message": "Task abandoned."}, status=status.HTTP_200_OK)
 
 
@@ -305,11 +312,19 @@ class TaskAcceptReviewView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
         earned_coins = task.coins if task.coins is not None else 0
         earned_xp = task.xp if task.xp is not None else 0
+
+        send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
+        # Push stats and achievements to the ASSIGNEE (not the owner who called this)
+        if task.assignee:
+            task.assignee.refresh_from_db()
+            send_user_stats(task.assignee)
+            send_achievements(task.assignee.id, new_achievements)
+
         return Response({
             "message": "Review accepted, task marked as done.",
             "earned_coins": earned_coins,
             "earned_xp": earned_xp,
-            "new_achievements": _serialize_achievements(new_achievements),
+            "new_achievements": [],  # Achievements belong to assignee, pushed via WS
         }, status=status.HTTP_200_OK)
 
 
@@ -325,6 +340,7 @@ class TaskDeclineReviewView(APIView):
             task.decline_review(request.user)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        send_task_update(task, action='decline_review', exclude_user_id=request.user.id)
         return Response({"message": "Review declined, task reset to open."}, status=status.HTTP_200_OK)
 
 
@@ -344,6 +360,7 @@ class TaskDebugResetView(APIView):
             return Response({"error": "Only the owner can reset the task"}, status=status.HTTP_403_FORBIDDEN)
 
         task.debug_reset()
+        send_task_update(task, action='debug_reset', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task reset to OPEN state"},
             status=status.HTTP_200_OK
@@ -355,6 +372,10 @@ def send_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.send_friend_request(target_user)
+        send_friend_event(target_user.id, {
+            'type': 'friend_request_received',
+            'from_user': {'id': request.user.id, 'username': request.user.username},
+        })
         return Response({'status': 'Friend request sent'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -402,7 +423,14 @@ def accept_friend_request(request, user_id):
             target_user_details
         )
 
+        # Notify the sender that their request was accepted
+        send_friend_event(target_user.id, {
+            'type': 'friend_request_accepted',
+            'user': {'id': request.user.id, 'username': request.user.username},
+        })
+
         new_achievements = request.user.check_and_award_achievements()
+        send_achievements(request.user.id, new_achievements)
         return Response({'status': 'Friend request accepted', 'new_achievements': _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -415,6 +443,10 @@ def reject_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.reject_friend_request(target_user)
+        send_friend_event(target_user.id, {
+            'type': 'friend_request_rejected',
+            'user_id': request.user.id,
+        })
         return Response({'status': 'Friend request rejected'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -427,6 +459,10 @@ def remove_friend(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.remove_friend(target_user)
+        send_friend_event(target_user.id, {
+            'type': 'friend_removed',
+            'user_id': request.user.id,
+        })
         return Response({'status': 'Friend removed'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
