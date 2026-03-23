@@ -36,28 +36,26 @@ export default function WelcomeModal() {
       background: 'rgba(0,0,0,0.7)',
       backdropFilter: 'blur(4px)',
     }}>
-      <div style={{
-        background: 'var(--pip-panel)',
-        border: '1px solid var(--pip-green)',
-        borderRadius: '8px',
-        maxWidth: '460px',
-        width: '90vw',
-        maxHeight: '80dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 0 30px rgba(46,194,126,0.15)',
-      }}>
+      <div
+        className="pip-panel"
+        style={{
+          maxWidth: '420px',
+          width: '90vw',
+          maxHeight: '80dvh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 16px',
+          padding: '10px 14px',
           borderBottom: '1px solid var(--pip-border)',
         }}>
           <span style={{
-            fontFamily: 'var(--pip-font)',
-            fontSize: '0.95rem',
+            fontSize: '0.8rem',
             fontWeight: 'bold',
             color: 'var(--pip-green)',
             letterSpacing: '0.1em',
@@ -72,7 +70,7 @@ export default function WelcomeModal() {
               border: 'none',
               color: 'var(--pip-text)',
               cursor: 'pointer',
-              fontSize: '1.2rem',
+              fontSize: '1rem',
               lineHeight: 1,
               padding: '2px 6px',
               opacity: 0.7,
@@ -85,15 +83,15 @@ export default function WelcomeModal() {
 
         {/* Body */}
         <div style={{
-          padding: '16px',
+          padding: '14px',
           overflowY: 'auto',
           flex: 1,
         }}>
           <pre style={{
             fontFamily: 'var(--pip-font)',
-            fontSize: '0.8rem',
+            fontSize: '0.75rem',
             color: 'var(--pip-text)',
-            lineHeight: 1.6,
+            lineHeight: 1.7,
             margin: 0,
             whiteSpace: 'pre-wrap',
             wordWrap: 'break-word',
@@ -106,25 +104,13 @@ export default function WelcomeModal() {
         <div style={{
           display: 'flex',
           justifyContent: 'flex-end',
-          gap: '10px',
-          padding: '12px 16px',
+          padding: '10px 14px',
           borderTop: '1px solid var(--pip-border)',
         }}>
           <button
             onClick={handleAccept}
-            style={{
-              fontFamily: 'var(--pip-font)',
-              fontSize: '0.75rem',
-              padding: '8px 20px',
-              background: 'var(--pip-green)',
-              color: '#000',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}
+            className="pip-btn pip-btn-primary"
+            style={{ fontSize: '0.7rem', padding: '6px 18px' }}
           >
             Got it
           </button>
