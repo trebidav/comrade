@@ -5,10 +5,11 @@ interface Props {
   task: Task
   onCompleted: (taskId: number, taskName: string) => void
   onLocate: (task: Task) => void
+  onAction: (action: string, taskId: number) => Promise<void>
   onNewAchievements?: (achievements: NewAchievement[]) => void
 }
 
-export default function TutorialPanel({ task, onCompleted, onLocate, onNewAchievements }: Props) {
+export default function TutorialPanel({ task, onCompleted, onLocate, onAction, onNewAchievements }: Props) {
   const [tutorial, setTutorial] = useState<TutorialData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -80,6 +81,7 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onNewAchiev
         {task.lat != null && task.lon != null && (
           <button className="pip-popup-btn" style={{ marginLeft: 'auto', fontSize: '0.55rem', padding: '1px 6px' }} onClick={() => onLocate(task)}>Locate</button>
         )}
+        <button className="pip-popup-btn" style={{ fontSize: '0.55rem', padding: '1px 6px', borderColor: '#EA4335', color: '#EA4335' }} onClick={() => onAction('abandon', task.id)}>Abandon</button>
       </div>
 
       <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '8px' }}>{task.name}</div>

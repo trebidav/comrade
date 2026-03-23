@@ -520,6 +520,7 @@ export default function MapView({ user, onLogout }: Props) {
                 task={activeTask}
                 onCompleted={(id, name) => { setRatingTarget({ id, name, requireComment: false }); fetchTasks() }}
                 onLocate={handleTaskClick}
+                onAction={handleTaskAction}
                 onNewAchievements={(a) => setAchievementToasts((prev) => [...prev, ...a])}
               />
             )
