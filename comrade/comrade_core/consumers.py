@@ -127,6 +127,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
             longitude = data['longitude']
             accuracy = data.get('accuracy', 50)  # Default accuracy if not provided
 
+            # Refresh user from DB to pick up profile_picture and other changes
+            self.user = await database_sync_to_async(User.objects.get)(pk=self.user.pk)
+
             # Get user's friends and skills for updates
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
             skills = await database_sync_to_async(
