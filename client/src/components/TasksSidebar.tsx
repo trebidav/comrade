@@ -193,8 +193,9 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
             displayedTasks.map((task, index) => {
               const dist = getDistance(task)
               const canExecute = task.skill_execute_names.length === 0 || task.skill_execute_names.some((s) => userSkills.includes(s))
-              const near = view !== 'all' || (inProximity(task) && canExecute)
+              const isReachable = view !== 'all' || (inProximity(task) && canExecute)
               const isActive = task.is_tutorial ? task.in_progress : task.state === 2
+              const greyed = !isReachable || task.state === 5
 
               return (
                 <div
@@ -206,9 +207,10 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                     borderBottom: '1px solid rgba(26, 115, 70, 0.2)',
                     borderLeft: isActive ? '3px solid #FBBC05' : '3px solid transparent',
                     cursor: 'pointer',
-                    opacity: task.state === 5 ? 0.45 : (near ? 1 : 0.5),
+                    opacity: greyed ? 0.35 : 1,
+                    filter: greyed ? 'grayscale(0.6)' : 'none',
                     touchAction: 'manipulation',
-                    transition: 'background 0.12s',
+                    transition: 'background 0.12s, opacity 0.15s, filter 0.15s',
                     animationDelay: `${Math.min(index, 5) * 40}ms`,
                   }}
                   onPointerDown={(e) => { e.currentTarget.style.background = 'var(--pip-btn-hover-bg)' }}
