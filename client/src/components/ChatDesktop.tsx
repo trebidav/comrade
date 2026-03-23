@@ -31,20 +31,19 @@ export default function Chat({ messages, onSend }: Props) {
         position: 'absolute',
         bottom: '16px',
         left: '16px',
-        width: '300px',
-        maxWidth: 'calc(100vw - 32px)',
-        height: minimized ? 'auto' : '400px',
-        maxHeight: 'calc(100dvh - 32px)',
+        width: '280px',
+        height: minimized ? 'auto' : '340px',
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         transition: 'height 0.2s',
+        fontSize: '12px',
       }}
     >
       {/* Header */}
       <div
         style={{
-          padding: '8px 14px',
+          padding: '6px 12px',
           borderBottom: '1px solid var(--pip-border)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -56,7 +55,7 @@ export default function Chat({ messages, onSend }: Props) {
       >
         <span
           style={{
-            fontSize: '0.75rem',
+            fontSize: '11px',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             color: 'var(--pip-green)',
@@ -70,7 +69,7 @@ export default function Chat({ messages, onSend }: Props) {
             border: 'none',
             color: 'var(--pip-text)',
             cursor: 'pointer',
-            fontSize: '1rem',
+            fontSize: '14px',
             lineHeight: 1,
             padding: 0,
           }}
@@ -87,16 +86,16 @@ export default function Chat({ messages, onSend }: Props) {
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '10px 12px',
+              padding: '8px 10px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
+              gap: '5px',
             }}
           >
             {messages.length === 0 ? (
               <div
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: '11px',
                   color: 'var(--pip-green-dark)',
                   textAlign: 'center',
                   marginTop: '12px',
@@ -117,9 +116,9 @@ export default function Chat({ messages, onSend }: Props) {
                   {!msg.isSelf && (
                     <span
                       style={{
-                        fontSize: '0.6rem',
+                        fontSize: '9px',
                         color: 'var(--pip-green-dark)',
-                        marginBottom: '2px',
+                        marginBottom: '1px',
                       }}
                     >
                       {msg.sender}
@@ -128,8 +127,8 @@ export default function Chat({ messages, onSend }: Props) {
                   <div
                     style={{
                       maxWidth: '80%',
-                      padding: '5px 10px',
-                      fontSize: '0.75rem',
+                      padding: '4px 8px',
+                      fontSize: '12px',
                       background: msg.isSelf
                         ? 'rgba(26, 115, 70, 0.5)'
                         : 'rgba(46, 194, 126, 0.1)',
@@ -150,8 +149,8 @@ export default function Chat({ messages, onSend }: Props) {
           <div
             style={{
               display: 'flex',
-              gap: '6px',
-              padding: '8px 10px',
+              gap: '4px',
+              padding: '6px 8px',
               borderTop: '1px solid var(--pip-border)',
               flexShrink: 0,
             }}
@@ -168,15 +167,26 @@ export default function Chat({ messages, onSend }: Props) {
                 border: '1px solid var(--pip-border)',
                 color: 'var(--pip-text)',
                 fontFamily: 'var(--pip-font)',
-                fontSize: '0.75rem',
+                fontSize: '12px',
                 padding: '4px 8px',
                 outline: 'none',
               }}
             />
             <button
               onClick={handleSend}
-              className="pip-btn pip-btn-primary"
-              style={{ flexShrink: 0 }}
+              style={{
+                flexShrink: 0,
+                background: 'var(--pip-green-dark)',
+                border: '1px solid var(--pip-green)',
+                color: 'var(--pip-bg)',
+                fontFamily: 'var(--pip-font)',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
             >
               Send
             </button>

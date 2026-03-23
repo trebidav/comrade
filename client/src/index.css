@@ -95,9 +95,13 @@ body::after {
   overflow: hidden;
 }
 
-/* Prevent iOS zoom on input focus */
+/* Prevent iOS zoom on input focus (mobile only) */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
 input, textarea, select {
-  font-size: 16px !important;
   font-family: var(--pip-font);
 }
 
