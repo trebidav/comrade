@@ -143,15 +143,39 @@ function makePin(symbol: 'exclaim' | 'question' | 'book', fill: string): string 
   </svg>`
 }
 
+const STATE_DOT_COLORS: Record<number, string> = {
+  0: '#555', 1: '#4285F4', 2: '#FBBC05', 3: '#9b59b6', 4: '#e67e22', 5: '#34A853',
+}
+
+function makeSmallDot(color: string): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7],
+  })
+}
+
 function taskIcon(
   task: Task,
   currentUserId: number,
   currentUserSkills: string[],
   selfLocation: { lat: number; lon: number } | null,
   proximityKm: number,
+  maxDistanceKm: number,
 ): L.DivIcon {
   const isMyTask = task.assignee === currentUserId
   const isTutorialActive = task.is_tutorial && !!task.in_progress
+
+  // Compute distance once for reuse
+  const distKm = selfLocation && task.lat != null && task.lon != null
+    ? haversineKm(selfLocation.lat, selfLocation.lon, task.lat, task.lon) : null
+  const outOfMaxRange = distKm !== null && distKm > maxDistanceKm
+
+  // Out of max range — small colored dot (keep state color)
+  if (outOfMaxRange && !isMyTask) {
+    const color = task.is_tutorial ? '#4285F4' : (STATE_DOT_COLORS[task.state ?? 0] ?? '#555')
+    return makeSmallDot(color)
+  }
 
   // My active task (tutorial in-progress) — spinner
   if (isTutorialActive) {
@@ -196,8 +220,6 @@ function taskIcon(
       // Grey ! — missing skill
       return L.divIcon({ className: '', html: makePin('exclaim', '#777'), iconSize: [28, 40], iconAnchor: [14, 39] })
     }
-    const distKm = selfLocation && task.lat != null && task.lon != null
-      ? haversineKm(selfLocation.lat, selfLocation.lon, task.lat, task.lon) : null
     const outOfReach = distKm !== null && distKm > proximityKm
     if (outOfReach) {
       // Dark amber ! — out of range
@@ -208,11 +230,7 @@ function taskIcon(
   }
 
   // Unavailable / done — tiny grey dot
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:#555;border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-    iconSize: [14, 14], iconAnchor: [7, 7],
-  })
+  return makeSmallDot('#555')
 }
 
 interface Props {
@@ -231,6 +249,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [ratingTarget, setRatingTarget] = useState<{ id: number; name: string; requireComment: boolean } | null>(null)
   const [createTaskPos, setCreateTaskPos] = useState<{ lat: number; lon: number } | null>(null)
   const [proximityKm, setProximityKm] = useState(1.0)
+  const [maxDistanceKm, setMaxDistanceKm] = useState(1.0)
   const [coinsModifier, setCoinsModifier] = useState(100.0)
   const [xpModifier, setXpModifier] = useState(1.0)
   const [timeModifierMinutes, setTimeModifierMinutes] = useState(15.0)
@@ -290,6 +309,7 @@ export default function MapView({ user, onLogout }: Props) {
     fetchTasks()
     api.get('/settings/proximity/').then((res) => {
       setProximityKm(res.data.radius_km ?? 1.0)
+      setMaxDistanceKm(res.data.max_distance_km ?? 1.0)
       setCoinsModifier(res.data.coins_modifier ?? 100.0)
       setXpModifier(res.data.xp_modifier ?? 1.0)
       setTimeModifierMinutes(res.data.time_modifier_minutes ?? 15.0)
@@ -463,7 +483,7 @@ export default function MapView({ user, onLogout }: Props) {
           {tasks
             .filter((t) => t.lat != null && t.lon != null)
             .map((task) => {
-              const icon = taskIcon(task, currentUser.id, currentUser.skills, selfLocation, proximityKm)
+              const icon = taskIcon(task, currentUser.id, currentUser.skills, selfLocation, proximityKm, maxDistanceKm)
               return (
                 <Marker
                   key={`${task.is_tutorial ? 't' : 'r'}-${task.id}`}
@@ -617,6 +637,7 @@ export default function MapView({ user, onLogout }: Props) {
           userSkills={currentUser.skills}
           selfLocation={selfLocation}
           proximityKm={proximityKm}
+          maxDistanceKm={maxDistanceKm}
           coinsModifier={coinsModifier}
           xpModifier={xpModifier}
           timeModifierMinutes={timeModifierMinutes}

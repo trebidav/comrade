@@ -11,6 +11,7 @@ interface Props {
   userSkills: string[]
   selfLocation: { lat: number; lon: number } | null
   proximityKm: number
+  maxDistanceKm: number
   coinsModifier: number
   xpModifier: number
   timeModifierMinutes: number
@@ -32,7 +33,7 @@ function canReview(task: Task, userId: number, userSkills: string[]): boolean {
   return (task.skill_write_names?.length ?? 0) > 0 && (task.skill_write_names ?? []).some((s) => userSkills.includes(s))
 }
 
-export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, proximityKm, coinsModifier, xpModifier, timeModifierMinutes, criticalityPercentage, pauseMultiplier, onTaskClick, onAction }: Props) {
+export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, proximityKm, maxDistanceKm, coinsModifier, xpModifier, timeModifierMinutes, criticalityPercentage, pauseMultiplier, onTaskClick, onAction }: Props) {
   const haptics = useHaptics()
 
   const getDistance = (task: Task): number | null => {
@@ -42,6 +43,10 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const inProximity = (task: Task): boolean => {
     const d = getDistance(task)
     return d === null || d <= proximityKm
+  }
+  const inMaxRange = (task: Task): boolean => {
+    const d = getDistance(task)
+    return d === null || d <= maxDistanceKm
   }
 
   const activeTasks = tasks.filter((t) =>
@@ -60,10 +65,11 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
     })
   const startableTasks = tasks
     .filter((t) =>
-      t.is_tutorial
+      (t.is_tutorial
         ? !t.in_progress
         : t.owner !== userId && t.state !== 2 && t.state !== 3 && t.state !== 4 &&
           (t.state !== 5 || t.datetime_respawn != null)
+      ) && inMaxRange(t)
     )
     .sort((a, b) => {
       const canExec = (t: Task) => t.skill_execute_names.length === 0 || t.skill_execute_names.some((s) => userSkills.includes(s))

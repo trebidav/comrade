@@ -360,7 +360,7 @@ class TaskDebugResetView(APIView):
             return Response({"error": "Only the owner can reset the task"}, status=status.HTTP_403_FORBIDDEN)
 
         task.debug_reset()
-        send_task_update(task, action='debug_reset', exclude_user_id=request.user.id)
+        send_task_update(task, action='reset', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task reset to OPEN state"},
             status=status.HTTP_200_OK
@@ -681,6 +681,7 @@ class ProximitySettingsView(APIView):
         config = LocationConfig.get_config()
         return Response({
             'radius_km': config.task_proximity_km,
+            'max_distance_km': config.max_distance_km,
             'coins_modifier': config.coins_modifier,
             'xp_modifier': config.xp_modifier,
             'time_modifier_minutes': config.time_modifier_minutes,
