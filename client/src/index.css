@@ -46,7 +46,7 @@
   --pip-font: monospace;
   --pip-btn-hover-bg: rgba(212, 168, 67, 0.15);
   --pip-popup-hover-bg: rgba(212, 168, 67, 0.2);
-  --pip-scanlines-opacity: 0.12;
+  --pip-scanlines-opacity: 0;
   --pip-scrollbar-track: #110d04;
   /* Glassmorphism desert */
   --glass-bg: rgba(28, 20, 8, 0.75);
@@ -85,6 +85,20 @@ body::after {
   pointer-events: none;
   z-index: 9999;
   opacity: var(--pip-scanlines-opacity);
+}
+
+/* CRT scanlines on pip-boy login screen only */
+:root .login-crt::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.3;
+}
+[data-theme="desert"] .login-crt::after {
+  opacity: 0;
 }
 
 #root {

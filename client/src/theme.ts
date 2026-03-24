@@ -105,47 +105,71 @@ const GOOGLE_ATTRIBUTION = '&copy; Google Maps'
 
 // Session cache: theme → { url, expiresAt }
 const sessionCache: Record<string, { url: string; expiresAt: number }> = {}
+// In-flight request deduplication
+const inflightRequests: Record<string, Promise<TileConfig | null>> = {}
+// Backoff: don't retry Google until this time
+let googleBackoffUntil = 0
 
-/** Invalidate cached Google session (e.g. on tile load errors). */
+/** Invalidate cached Google session with backoff to prevent retry storms. */
 export function invalidateGoogleSession(theme: Theme) {
   delete sessionCache[theme]
+  // Back off for 5 minutes before trying Google again
+  googleBackoffUntil = Date.now() + 5 * 60 * 1000
 }
 
 /**
  * Create a Google Map Tiles API session and return the tile URL.
  * Returns null if the API key is missing or session creation fails.
  * Falls back to TILE_CONFIGS in that case.
+ * Deduplicates concurrent requests and respects backoff after errors.
  */
 export async function getGoogleTileUrl(theme: Theme): Promise<TileConfig | null> {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
   if (!apiKey) return null
+
+  // Respect backoff period after tile errors
+  if (Date.now() < googleBackoffUntil) return null
 
   const cached = sessionCache[theme]
   if (cached && cached.expiresAt > Date.now()) {
     return { url: cached.url, attribution: GOOGLE_ATTRIBUTION, filter: undefined }
   }
 
-  try {
-    const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mapType: 'roadmap',
-        language: 'en-US',
-        region: 'US',
-        styles: GOOGLE_STYLES[theme],
-      }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.session) return null
+  // Deduplicate: if a request for this theme is already in-flight, reuse it
+  if (inflightRequests[theme]) return inflightRequests[theme]
 
-    const url = `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${data.session}&key=${apiKey}`
-    const expiry = data.expiry ? new Date(data.expiry).getTime() - 60000 : Date.now() + 23 * 3600000
-    sessionCache[theme] = { url, expiresAt: expiry }
+  const request = (async (): Promise<TileConfig | null> => {
+    try {
+      const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mapType: 'roadmap',
+          language: 'en-US',
+          region: 'US',
+          styles: GOOGLE_STYLES[theme],
+        }),
+      })
+      if (!res.ok) {
+        // Back off on session creation failure (quota/rate limit)
+        googleBackoffUntil = Date.now() + 5 * 60 * 1000
+        return null
+      }
+      const data = await res.json()
+      if (!data.session) return null
 
-    return { url, attribution: GOOGLE_ATTRIBUTION, filter: undefined }
-  } catch {
-    return null
-  }
+      const url = `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${data.session}&key=${apiKey}`
+      const expiry = data.expiry ? new Date(data.expiry).getTime() - 60000 : Date.now() + 23 * 3600000
+      sessionCache[theme] = { url, expiresAt: expiry }
+
+      return { url, attribution: GOOGLE_ATTRIBUTION, filter: undefined }
+    } catch {
+      return null
+    } finally {
+      delete inflightRequests[theme]
+    }
+  })()
+
+  inflightRequests[theme] = request
+  return request
 }

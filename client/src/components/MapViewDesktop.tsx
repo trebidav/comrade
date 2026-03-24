@@ -406,7 +406,10 @@ export default function MapView({ user, onLogout }: Props) {
             attribution={tileConfig.attribution}
             url={tileConfig.url}
             crossOrigin="anonymous"
-            eventHandlers={{ tileerror: () => { const t = getTheme(); invalidateGoogleSession(t); setTileConfig(TILE_CONFIGS[t]) } }}
+            maxZoom={18}
+            maxNativeZoom={18}
+            updateWhenZooming={false}
+            eventHandlers={{ tileerror: () => { if (tileConfig.url.includes('tile.googleapis.com')) { const t = getTheme(); invalidateGoogleSession(t); setTileConfig(TILE_CONFIGS[t]) } } }}
           />
           <RecenterOnMount lat={centerLat} lon={centerLon} />
           <MapPanTo target={panTarget} />
