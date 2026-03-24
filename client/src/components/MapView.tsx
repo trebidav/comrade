@@ -382,7 +382,7 @@ export default function MapView({ user, onLogout }: Props) {
           zoomControl={false}
           attributionControl={false}
         >
-          <TileLayer key={tileConfig.url} attribution={tileConfig.attribution} url={tileConfig.url} />
+          <TileLayer key={tileConfig.url} attribution={tileConfig.attribution} url={tileConfig.url} crossOrigin="anonymous" />
           <RecenterOnMount lat={centerLat} lon={centerLon} />
           <MapPanTo target={panTarget} />
           <CenterOnMeListener />

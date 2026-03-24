@@ -405,6 +405,7 @@ export default function MapView({ user, onLogout }: Props) {
             key={tileConfig.url}
             attribution={tileConfig.attribution}
             url={tileConfig.url}
+            crossOrigin="anonymous"
           />
           <RecenterOnMount lat={centerLat} lon={centerLon} />
           <MapPanTo target={panTarget} />
