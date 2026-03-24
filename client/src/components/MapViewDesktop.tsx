@@ -139,17 +139,13 @@ function taskIcon(
 
   // Determine the task color using the same logic for both pins and dots
   let taskColor = '#555' // default: unavailable/done
-  let pinSymbol: 'exclaim' | 'question' | 'book' = 'exclaim'
 
   if (task.is_tutorial) {
     taskColor = '#4285F4'
-    pinSymbol = 'book'
   } else if (isMyTask && task.state === 2) {
     taskColor = '#FBBC05'
-    pinSymbol = 'question'
   } else if (isMyTask && task.state === 3) {
     taskColor = '#777'
-    pinSymbol = 'question'
   } else if (task.state === 1) {
     const hasSkill = task.skill_execute_names.length === 0 ||
       task.skill_execute_names.some((s) => currentUserSkills.includes(s))
