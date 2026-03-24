@@ -146,7 +146,7 @@ function makePin(symbol: 'exclaim' | 'question' | 'book', fill: string): string 
 function makeSmallDot(color: string): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
     iconSize: [14, 14], iconAnchor: [7, 7],
   })
 }
@@ -565,7 +565,7 @@ export default function MapView({ user, onLogout }: Props) {
         activeTask.is_tutorial ? (
           <TutorialPanel
             task={activeTask}
-            onCompleted={(id, name) => { setRatingTarget({ id, name, requireComment: false }); fetchTasks() }}
+            onCompleted={() => { fetchTasks() }}
             onLocate={handleTaskClick}
             onAction={handleTaskAction}
             onNewAchievements={(a) => setAchievementToasts((prev) => [...prev, ...a])}

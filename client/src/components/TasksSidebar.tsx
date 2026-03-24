@@ -285,8 +285,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                       </span>
                     )}
                     {task.pending_review && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); haptics.medium(); setReviewTask(task) }}
+                      <span
                         style={{
                           fontSize: '0.65rem',
                           padding: '3px 8px',
@@ -294,15 +293,12 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                           border: '1px solid rgba(230,126,34,0.6)',
                           color: '#e67e22',
                           borderRadius: '10px',
-                          cursor: 'pointer',
                           fontFamily: 'var(--pip-font)',
                           textTransform: 'uppercase',
-                          minHeight: '28px',
-                          touchAction: 'manipulation',
                         }}
                       >
                         Review
-                      </button>
+                      </span>
                     )}
                   </div>
 

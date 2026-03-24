@@ -201,7 +201,7 @@ export default function Login({ onLogin }: Props) {
 
         <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', letterSpacing: '0.08em' }}>
-            Dev: david / david · worker / worker
+            comrade-0.1.0-beta
           </div>
         </div>
       </div>

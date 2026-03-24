@@ -117,7 +117,7 @@ function makePin(symbol: 'exclaim' | 'question' | 'book', fill: string): string 
 function makeSmallDot(color: string): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
     iconSize: [14, 14], iconAnchor: [7, 7],
   })
 }
@@ -553,7 +553,7 @@ export default function MapView({ user, onLogout }: Props) {
             if (activeTask.is_tutorial) return (
               <TutorialPanel
                 task={activeTask}
-                onCompleted={(id, name) => { setRatingTarget({ id, name, requireComment: false }); fetchTasks() }}
+                onCompleted={() => { fetchTasks() }}
                 onLocate={handleTaskClick}
                 onAction={handleTaskAction}
                 onNewAchievements={(a) => setAchievementToasts((prev) => [...prev, ...a])}
@@ -718,10 +718,18 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
         />
       )}
 
-      <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>
-        <span style={{ color: 'var(--pip-green-dark)' }}>Status: </span>
-        <span>{task.is_tutorial ? (task.in_progress ? 'In Progress' : 'Open') : STATE_LABELS[task.state ?? 1]}</span>
-      </div>
+      {!task.is_tutorial && (
+        <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>
+          <span style={{ color: 'var(--pip-green-dark)' }}>Status: </span>
+          <span>{STATE_LABELS[task.state ?? 1]}</span>
+        </div>
+      )}
+      {task.is_tutorial && task.reward_skill_name && (
+        <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>
+          <span style={{ color: 'var(--pip-green-dark)' }}>Reward: </span>
+          <span style={{ color: '#34A853' }}>{task.reward_skill_name}</span>
+        </div>
+      )}
 
       {task.state === 3 && task.datetime_paused && task.minutes != null && (
         <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>

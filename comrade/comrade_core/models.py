@@ -617,6 +617,7 @@ class Task(models.Model):
         self.datetime_start = None
         self.datetime_finish = None
         self.save()
+        self.reviews.filter(status=Review.Status.PENDING).delete()
 
 
 class Rating(models.Model):

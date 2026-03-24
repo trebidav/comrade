@@ -24,6 +24,7 @@ export interface Task {
   is_tutorial: boolean
   // Tutorial-only
   in_progress?: boolean
+  reward_skill_name?: string | null
   // Regular task fields
   state?: number
   criticality?: number

@@ -308,8 +308,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   )}
                   {/* Pending review badge */}
                   {task.pending_review && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setReviewTask(task) }}
+                    <span
                       style={{
                         fontSize: '0.55rem',
                         padding: '1px 6px',
@@ -317,14 +316,13 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                         border: '1px solid rgba(230,126,34,0.6)',
                         color: '#e67e22',
                         borderRadius: '2px',
-                        cursor: 'pointer',
                         fontFamily: 'var(--pip-font)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                       }}
                     >
                       Pending Review
-                    </button>
+                    </span>
                   )}
                 </div>
                 {task.skill_execute_names.length > 0 && (

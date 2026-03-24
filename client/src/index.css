@@ -43,7 +43,7 @@
   --pip-border: #8b6914;
   --pip-text: #e8c87a;
   --pip-glow: 0 0 10px rgba(212, 168, 67, 0.5);
-  --pip-font: 'Cinzel', 'Palatino Linotype', Palatino, serif;
+  --pip-font: monospace;
   --pip-btn-hover-bg: rgba(212, 168, 67, 0.15);
   --pip-popup-hover-bg: rgba(212, 168, 67, 0.2);
   --pip-scanlines-opacity: 0.12;
@@ -261,7 +261,7 @@ input.rating-slider::-moz-range-thumb {
   border-radius: 0 !important;
 }
 .leaflet-popup-tip { background: var(--pip-border) !important; }
-.leaflet-popup-close-button { color: var(--pip-green) !important; font-size: 20px !important; padding: 6px !important; }
+.leaflet-popup-close-button { color: var(--pip-green) !important; font-size: 20px !important; top: 6px !important; right: 8px !important; }
 
 /* ── Task map markers ─────────────────────────────────────────────────────── */
 .task-marker-dot {

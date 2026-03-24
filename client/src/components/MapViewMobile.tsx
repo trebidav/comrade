@@ -146,7 +146,7 @@ function makePin(symbol: 'exclaim' | 'question' | 'book', fill: string): string 
 function makeSmallDot(color: string): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
     iconSize: [14, 14], iconAnchor: [7, 7],
   })
 }
@@ -611,7 +611,7 @@ export default function MapView({ user, onLogout }: Props) {
         activeTask.is_tutorial ? (
           <TutorialPanel
             task={activeTask}
-            onCompleted={(id, name) => { setRatingTarget({ id, name, requireComment: false }); fetchTasks() }}
+            onCompleted={() => { fetchTasks() }}
             onLocate={handleTaskClick}
             onAction={handleTaskAction}
             onNewAchievements={(a) => setAchievementToasts((prev) => [...prev, ...a])}
@@ -798,12 +798,22 @@ function TaskDetailContent({
     0: '#555', 1: '#4285F4', 2: '#FBBC05', 3: '#9b59b6', 4: '#e67e22', 5: '#34A853',
   }
 
-  const stateColor = task.is_tutorial ? '#FBBC05' : (task.state != null ? STATE_COLORS[task.state] : '#555')
+  // Accent bar color — matches map pin logic
+  let accentColor = '#555'
+  if (task.is_tutorial) {
+    accentColor = '#4285F4'
+  } else if (task.state === 1) {
+    const hasSkill = task.skill_execute_names.length === 0 || task.skill_execute_names.some((s) => currentUserSkills.includes(s))
+    if (!hasSkill) accentColor = '#777'
+    else accentColor = inProximity ? '#FBBC05' : '#b8860b'
+  } else if (task.state != null) {
+    accentColor = STATE_COLORS[task.state] ?? '#555'
+  }
 
   return (
     <div>
       {/* Hero accent bar */}
-      <div style={{ height: '4px', background: stateColor, opacity: 0.7 }} />
+      <div style={{ height: '4px', background: accentColor, opacity: 0.7 }} />
 
       <div style={{ padding: '16px 16px 20px' }}>
         {/* Title + meta */}
@@ -827,42 +837,70 @@ function TaskDetailContent({
           )}
         </div>
 
-        {/* Reward chips row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
+        {/* Info rows — desktop style */}
+        <div style={{ fontSize: '0.78rem', marginBottom: '14px' }}>
           {!task.is_tutorial && task.state != null && (
-            <span className="state-badge" style={{ borderColor: STATE_COLORS[task.state], color: STATE_COLORS[task.state] }}>
-              {STATE_LABELS[task.state] ?? 'Unknown'}
-            </span>
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Status: </span>
+              <span>{STATE_LABELS[task.state] ?? 'Unknown'}</span>
+            </div>
+          )}
+          {task.is_tutorial && task.reward_skill_name && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Reward: </span>
+              <span style={{ color: '#34A853' }}>{task.reward_skill_name}</span>
+            </div>
+          )}
+          {task.state === 3 && task.datetime_paused && task.minutes != null && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Resets in: </span>
+              <span style={{ color: '#e67e22' }}>{formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}</span>
+            </div>
+          )}
+          {task.state === 5 && task.datetime_respawn && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Respawns in: </span>
+              <span style={{ color: '#9b59b6' }}>↺ {formatCountdown(task.datetime_respawn)}</span>
+            </div>
+          )}
+          {task.assignee_name && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Assigned to: </span>
+              <span>{task.assignee_name}</span>
+            </div>
+          )}
+          {distanceKm !== null && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Distance: </span>
+              <span style={{ color: inProximity ? 'var(--pip-text)' : '#EA4335' }}>{formatDistance(distanceKm)}</span>
+              {!inProximity && <span style={{ color: '#EA4335' }}> (out of range)</span>}
+            </div>
           )}
           {task.minutes != null && (
-            <span style={{ fontSize: '0.72rem', color: 'var(--pip-green-dark)' }}>⏱ {formatMinutes(task.minutes)}</span>
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Est. time: </span>
+              <span>{formatMinutes(task.minutes)}</span>
+            </div>
           )}
-          {task.coins != null && (
-            <span className="reward-chip reward-chip-gold">
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block' }} />
-              {Math.round(task.coins * coinsModifier * tm)}
-            </span>
-          )}
-          {task.xp != null && (() => {
-            const base = Math.round(task.xp! * xpModifier * tm)
-            const extra = Math.round(task.xp! * xpModifier * tm * cf) - base
-            return (
-              <span className="reward-chip reward-chip-blue">
-                ⭐ {base}{extra > 0 && <span style={{ color: '#89b4f8', fontSize: '0.75em' }}>+{extra}</span>}
-              </span>
-            )
-          })()}
-          {/* Paused countdown */}
-          {task.state === 3 && task.datetime_paused && task.minutes != null && (
-            <span style={{ fontSize: '0.72rem', color: '#e67e22' }}>
-              ⏱ {formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}
-            </span>
-          )}
-          {/* Respawn countdown */}
-          {task.state === 5 && task.datetime_respawn && (
-            <span style={{ fontSize: '0.72rem', color: '#9b59b6' }}>
-              ↺ {formatCountdown(task.datetime_respawn)}
-            </span>
+          {(task.coins != null || task.xp != null) && (
+            <div style={{ marginBottom: '4px', display: 'flex', gap: '10px' }}>
+              {task.coins != null && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#FBBC05' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FBBC05', display: 'inline-block', flexShrink: 0 }} />
+                  {Math.round(task.coins * coinsModifier * tm)}
+                </span>
+              )}
+              {task.xp != null && (() => {
+                const base = Math.round(task.xp! * xpModifier * tm)
+                const extra = Math.round(task.xp! * xpModifier * tm * cf) - base
+                return (
+                  <span>
+                    <span style={{ color: 'var(--pip-green-dark)' }}>XP: </span>
+                    <span style={{ color: '#4285F4' }}>{base}{extra > 0 && <span style={{ color: '#89b4f8' }}>+{extra}</span>}</span>
+                  </span>
+                )
+              })()}
+            </div>
           )}
         </div>
 
