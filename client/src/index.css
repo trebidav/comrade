@@ -14,7 +14,7 @@
   --pip-font: monospace;
   --pip-btn-hover-bg: rgba(46, 194, 126, 0.15);
   --pip-popup-hover-bg: rgba(46, 194, 126, 0.2);
-  --pip-scanlines-opacity: 0.3;
+  --pip-scanlines-opacity: 0;
   --pip-scrollbar-track: #050805;
   /* Layout */
   --nav-height: 72px;

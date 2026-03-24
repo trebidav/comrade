@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import api, { type Task, type User, type NewAchievement, STATE_LABELS, haversineKm, formatDistance, formatMinutes, formatCountdown, realTaskId } from '../api'
-import { getTheme, applyTheme, TILE_CONFIGS, type TileConfig } from '../theme'
+import { getTheme, applyTheme, TILE_CONFIGS, getGoogleTileUrl, type TileConfig, type Theme } from '../theme'
 import Chat from './Chat'
 import TasksSidebar from './TasksSidebar'
 import ActiveTaskPanel from './ActiveTaskPanel'
@@ -252,9 +252,13 @@ export default function MapView({ user, onLogout }: Props) {
 
   useEffect(() => {
     const theme = getTheme()
+    const loadTiles = async (t: Theme) => {
+      const google = await getGoogleTileUrl(t)
+      setTileConfig(google ?? TILE_CONFIGS[t])
+    }
     applyTheme(theme)
-    setTileConfig(TILE_CONFIGS[theme])
-    const onThemeChange = () => setTileConfig(TILE_CONFIGS[getTheme()])
+    loadTiles(theme)
+    const onThemeChange = () => loadTiles(getTheme())
     window.addEventListener('comrade-theme-change', onThemeChange)
     return () => window.removeEventListener('comrade-theme-change', onThemeChange)
   }, [])

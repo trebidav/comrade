@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import api, { type Task, type User, type NewAchievement, STATE_LABELS, haversineKm, formatDistance, formatMinutes, formatCountdown, realTaskId } from '../api'
-import { getTheme, applyTheme, TILE_CONFIGS, type TileConfig } from '../theme'
+import { getTheme, applyTheme, TILE_CONFIGS, getGoogleTileUrl, type TileConfig, type Theme } from '../theme'
 import Chat from './ChatDesktop'
 import TasksSidebar from './TasksSidebarDesktop'
 import ActiveTaskPanel from './ActiveTaskPanelDesktop'
@@ -226,14 +226,15 @@ export default function MapView({ user, onLogout }: Props) {
 
   // Apply persisted theme on mount and listen for changes
   useEffect(() => {
+    const loadTiles = async (t: Theme) => {
+      const google = await getGoogleTileUrl(t)
+      setTileConfig(google ?? TILE_CONFIGS[t])
+    }
     const theme = getTheme()
     applyTheme(theme)
-    setTileConfig(TILE_CONFIGS[theme])
+    loadTiles(theme)
 
-    const onThemeChange = () => {
-      const t = getTheme()
-      setTileConfig(TILE_CONFIGS[t])
-    }
+    const onThemeChange = () => loadTiles(getTheme())
     window.addEventListener('comrade-theme-change', onThemeChange)
     return () => window.removeEventListener('comrade-theme-change', onThemeChange)
   }, [])

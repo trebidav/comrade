@@ -159,6 +159,7 @@ React SPA (`index.html`) served for all routes not matching `/api/`, `/admin/`, 
 | `GOOGLE_OAUTH_CLIENT_ID`  | Google Cloud Console OAuth client ID                 |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console OAuth secret                 |
 | `GOOGLE_REDIRECT_URI`     | Must match URI in Google Cloud Console               |
+| `VITE_GOOGLE_MAPS_API_KEY` | Google Maps API key (Map Tiles API) — exposed to frontend via Vite `VITE_` prefix, secured by referrer restriction in Cloud Console. Used for Night (pip-boy) and Retro (desert) styled map tiles. Falls back to CartoDB tiles if missing. |
 
 ## Railway CLI — Cheatsheet
 

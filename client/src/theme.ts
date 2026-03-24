@@ -31,15 +31,115 @@ export interface TileConfig {
   filter: string | undefined
 }
 
+// Fallback tiles when Google Maps API key is unavailable
 export const TILE_CONFIGS: Record<Theme, TileConfig> = {
   pipboy: {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    filter: 'sepia(1) hue-rotate(70deg) saturate(0.8)',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    filter: undefined,
   },
   desert: {
     url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
     filter: undefined,
   },
+}
+
+// Google Maps "Night" style JSON
+const NIGHT_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
+  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
+]
+
+// Google Maps "Retro" style JSON
+const RETRO_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#ebe3cd' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#523735' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f1e6' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#c9b2a6' }] },
+  { featureType: 'administrative.land_parcel', elementType: 'geometry.stroke', stylers: [{ color: '#dcd2be' }] },
+  { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#ae9e90' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#dfd2ae' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#dfd2ae' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#93817c' }] },
+  { featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{ color: '#a5b076' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#447530' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f1e6' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#fdfcf8' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#f8c967' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#e9bc62' }] },
+  { featureType: 'road.highway.controlled_access', elementType: 'geometry', stylers: [{ color: '#e98d58' }] },
+  { featureType: 'road.highway.controlled_access', elementType: 'geometry.stroke', stylers: [{ color: '#db8555' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#806b63' }] },
+  { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#dfd2ae' }] },
+  { featureType: 'transit.line', elementType: 'labels.text.fill', stylers: [{ color: '#8f7d77' }] },
+  { featureType: 'transit.line', elementType: 'labels.text.stroke', stylers: [{ color: '#ebe3cd' }] },
+  { featureType: 'transit.station', elementType: 'geometry', stylers: [{ color: '#dfd2ae' }] },
+  { featureType: 'water', elementType: 'geometry.fill', stylers: [{ color: '#b9d3c2' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#92998d' }] },
+]
+
+const GOOGLE_STYLES: Record<Theme, object[]> = {
+  pipboy: NIGHT_STYLES,
+  desert: RETRO_STYLES,
+}
+
+const GOOGLE_ATTRIBUTION = '&copy; Google Maps'
+
+// Session cache: theme → { url, expiresAt }
+const sessionCache: Record<string, { url: string; expiresAt: number }> = {}
+
+/**
+ * Create a Google Map Tiles API session and return the tile URL.
+ * Returns null if the API key is missing or session creation fails.
+ * Falls back to TILE_CONFIGS in that case.
+ */
+export async function getGoogleTileUrl(theme: Theme): Promise<TileConfig | null> {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+  if (!apiKey) return null
+
+  const cached = sessionCache[theme]
+  if (cached && cached.expiresAt > Date.now()) {
+    return { url: cached.url, attribution: GOOGLE_ATTRIBUTION, filter: undefined }
+  }
+
+  try {
+    const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mapType: 'roadmap',
+        language: 'en-US',
+        region: 'US',
+        styles: GOOGLE_STYLES[theme],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data.session) return null
+
+    const url = `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${data.session}&key=${apiKey}`
+    const expiry = data.expiry ? new Date(data.expiry).getTime() - 60000 : Date.now() + 23 * 3600000
+    sessionCache[theme] = { url, expiresAt: expiry }
+
+    return { url, attribution: GOOGLE_ATTRIBUTION, filter: undefined }
+  } catch {
+    return null
+  }
 }
