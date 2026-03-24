@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import api, { type Task, type User, type NewAchievement, STATE_LABELS, haversineKm, formatDistance, formatMinutes, formatCountdown, realTaskId } from '../api'
-import { getTheme, applyTheme, TILE_CONFIGS, getGoogleTileUrl, type TileConfig, type Theme } from '../theme'
+import { getTheme, applyTheme, TILE_CONFIGS, getGoogleTileUrl, invalidateGoogleSession, type TileConfig, type Theme } from '../theme'
 import Chat from './ChatDesktop'
 import TasksSidebar from './TasksSidebarDesktop'
 import ActiveTaskPanel from './ActiveTaskPanelDesktop'
@@ -406,6 +406,7 @@ export default function MapView({ user, onLogout }: Props) {
             attribution={tileConfig.attribution}
             url={tileConfig.url}
             crossOrigin="anonymous"
+            eventHandlers={{ tileerror: () => { const t = getTheme(); invalidateGoogleSession(t); setTileConfig(TILE_CONFIGS[t]) } }}
           />
           <RecenterOnMount lat={centerLat} lon={centerLon} />
           <MapPanTo target={panTarget} />

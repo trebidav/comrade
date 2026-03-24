@@ -106,6 +106,11 @@ const GOOGLE_ATTRIBUTION = '&copy; Google Maps'
 // Session cache: theme → { url, expiresAt }
 const sessionCache: Record<string, { url: string; expiresAt: number }> = {}
 
+/** Invalidate cached Google session (e.g. on tile load errors). */
+export function invalidateGoogleSession(theme: Theme) {
+  delete sessionCache[theme]
+}
+
 /**
  * Create a Google Map Tiles API session and return the tile URL.
  * Returns null if the API key is missing or session creation fails.
@@ -134,6 +139,15 @@ export async function getGoogleTileUrl(theme: Theme): Promise<TileConfig | null>
     if (!res.ok) return null
     const data = await res.json()
     if (!data.session) return null
+
+    // Verify a tile actually loads before committing to Google tiles
+    const testUrl = `https://tile.googleapis.com/v1/2dtiles/1/0/0?session=${data.session}&key=${apiKey}`
+    try {
+      const testRes = await fetch(testUrl)
+      if (!testRes.ok) return null
+    } catch {
+      return null
+    }
 
     const url = `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${data.session}&key=${apiKey}`
     const expiry = data.expiry ? new Date(data.expiry).getTime() - 60000 : Date.now() + 23 * 3600000
