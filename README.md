@@ -1,6 +1,6 @@
 # Comrade: OpenSource task manager for any community. Gamified.
 
-<img width="1122" height="866" alt="Comrade-Desktop" src="https://github.com/user-attachments/assets/09f97127-3221-41c5-a921-b14c92dcf957" />
+<img width="1122" height="866" alt="Comrade-Desktop" src="https://github.com/user-attachments/assets/12a3c7fa-514d-4a06-b6c9-aebdce025f55" />
 
 
 ### Main idea
