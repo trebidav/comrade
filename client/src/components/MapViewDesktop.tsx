@@ -737,6 +737,12 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
           <span style={{ color: '#e67e22' }}>⏱ {formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}</span>
         </div>
       )}
+      {!task.is_tutorial && task.respawn && (
+        <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>
+          <span style={{ color: 'var(--pip-green-dark)' }}>Respawn: </span>
+          <span>{task.respawn_offset ? formatMinutes(task.respawn_offset) : task.respawn_time ?? 'Yes'}</span>
+        </div>
+      )}
       {task.state === 5 && task.datetime_respawn && (
         <div style={{ fontSize: '0.65rem', marginBottom: '4px' }}>
           <span style={{ color: 'var(--pip-green-dark)' }}>Respawns in: </span>

@@ -857,10 +857,10 @@ function TaskDetailContent({
               <span style={{ color: '#e67e22' }}>{formatCountdown(new Date(new Date(task.datetime_paused).getTime() + task.minutes * pauseMultiplier * 60000).toISOString())}</span>
             </div>
           )}
-          {task.state === 5 && task.datetime_respawn && (
+          {!task.is_tutorial && task.respawn && (
             <div style={{ marginBottom: '4px' }}>
-              <span style={{ color: 'var(--pip-green-dark)' }}>Respawns in: </span>
-              <span style={{ color: '#9b59b6' }}>↺ {formatCountdown(task.datetime_respawn)}</span>
+              <span style={{ color: 'var(--pip-green-dark)' }}>Respawn: </span>
+              <span>{task.respawn_offset ? formatMinutes(task.respawn_offset) : task.respawn_time ?? 'Yes'}</span>
             </div>
           )}
           {task.assignee_name && (
@@ -960,8 +960,8 @@ function TaskDetailContent({
         )}
 
         {!task.is_tutorial && task.state === 5 && task.datetime_respawn && (
-          <div style={{ padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: '#9b59b6' }}>
-            Respawns {formatCountdown(task.datetime_respawn)}
+          <div style={{ padding: '10px', background: 'rgba(155,89,182,0.08)', border: '1px solid rgba(155,89,182,0.3)', fontSize: '0.8rem', color: '#9b59b6', textAlign: 'center' }}>
+            Respawns in ↺ {formatCountdown(task.datetime_respawn)}
           </div>
         )}
 
@@ -976,12 +976,6 @@ function TaskDetailContent({
         )}
       </div>
 
-      {/* Assigned to info */}
-      {task.assignee_name && (
-        <div style={{ marginTop: '14px', fontSize: '0.75rem', color: 'var(--pip-green-dark)' }}>
-          Assigned to: <span style={{ color: 'var(--pip-text)' }}>{task.assignee_name}</span>
-        </div>
-      )}
       </div>
     </div>
   )

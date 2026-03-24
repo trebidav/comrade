@@ -43,6 +43,9 @@ export interface Task {
   datetime_start?: string | null
   datetime_finish?: string | null
   datetime_paused?: string | null
+  respawn?: boolean
+  respawn_time?: string | null
+  respawn_offset?: number | null
   datetime_respawn?: string | null
   time_spent_minutes?: number | null
   pending_review?: {
