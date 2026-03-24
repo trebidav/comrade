@@ -2,43 +2,105 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Local Development
 
-### Backend (Django)
+### Required services (3 terminals)
 ```bash
-# From /comrade/comrade/ (the Django project root, where manage.py lives)
-pipenv shell
-pipenv sync
-python manage.py runserver          # Start dev server on :8000
-python manage.py makemigrations     # After any model changes
-python manage.py migrate            # Apply migrations
-python manage.py test               # Run tests
-pytest                              # Alternative test runner
+# Terminal 1 — Redis (required for WebSocket channels)
+redis-server                          # must be running on localhost:6379
+
+# Terminal 2 — Django (ASGI via Daphne, serves API + WebSockets)
+cd comrade && pipenv run python manage.py runserver   # :8000
+# Note: daphne is in INSTALLED_APPS, so `runserver` uses ASGI automatically
+# This means WebSocket (/ws/...) works without running daphne separately
+
+# Terminal 3 — Vite (React dev server, proxies /api /ws /media → :8000)
+cd client && npm run dev              # :3000
+```
+**Access the app at http://localhost:3000** (not :8000)
+
+### Environment variables (local)
+All local config is in `.env` at the deploy root (next to Pipfile). Loaded by `python-dotenv` in settings.py.
+`VITE_` prefixed vars are embedded into the frontend build by Vite — restart Vite after changing them.
+
+### Common dev commands
+```bash
+# After model changes:
+cd comrade && python manage.py makemigrations && python manage.py migrate
+
+# Restart Vite (needed after .env changes to VITE_ vars):
+# Ctrl+C the npm process, then: cd client && npm run dev
+
+# Restart Django:
+# Ctrl+C the runserver process, then: cd comrade && pipenv run python manage.py runserver
+
+# Install new Python dependency:
+pipenv install <package>
+
+# Install new JS dependency:
+cd client && npm install <package>
 ```
 
-### Frontend (React/Vite)
+## Production (Railway)
+
+### Stack
+| Component | Local | Production |
+|-----------|-------|------------|
+| **App server** | Django runserver (Daphne ASGI) on :8000 | Daphne on `$PORT` |
+| **Frontend** | Vite dev server on :3000 | Built to `client/dist/`, served by WhiteNoise via `/static/` |
+| **Database** | SQLite (`db.sqlite3`) | PostgreSQL (Railway plugin, `DATABASE_URL`) |
+| **Redis** | `localhost:6379` | Railway Redis plugin (`REDIS_URL`) |
+| **Static files** | Vite serves directly | WhiteNoise from `staticfiles/` |
+| **Map tiles** | Google Maps Tiles API (Night/Retro) | Same (falls back to CartoDB if no API key) |
+| **Auth** | Google OAuth (credentials in `.env`) | Google OAuth (credentials in Railway env vars) |
+| **Debug** | `DEBUG=True` (default) | `DEBUG=False` (Railway env var) |
+
+### Deploy to production
 ```bash
-# From /comrade/client/
-npm install
-npm run dev     # Start dev server on :3000 (proxies /api, /ws, /media to :8000)
-npm run build   # Production build to dist/
+git add <files> && git commit -m "message" && git push
+# Railway auto-builds on push to the tracked branch
 ```
 
-### Required Services
-Redis must be running on localhost:6379 for WebSocket channels to work.
+### Monitor deployments
+```bash
+railway logs --build              # Build logs (npm, collectstatic, etc.)
+railway logs --tail 50            # Live runtime logs
+railway deployment list           # Recent deploys and status
+```
+
+### Manage production
+```bash
+# Environment variables
+railway variables                 # List all env vars
+railway variable set KEY=value    # Set/update a var
+# Note: VITE_ vars require a redeploy (they're baked into JS at build time)
+
+# Restart / redeploy
+railway restart                   # Restart container (no rebuild)
+railway redeploy                  # Full rebuild + redeploy
+
+# SSH & Django commands
+railway ssh                       # Interactive shell
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py <command>"
+
+# Database
+railway connect postgres          # Direct psql shell
+railway ssh -- "cd /app/comrade && /app/.venv/bin/python manage.py migrate"
+```
 
 ### After any backend change
 Always run `makemigrations` + `migrate` + restart the backend.
 
 ## Architecture Overview
 
-**Comrade** is a gamified, location-based community task manager with a pip-boy (Fallout-inspired) dark green UI theme.
+**Comrade** is a gamified, location-based community task manager with two themes: pip-boy (Fallout-inspired dark green) and desert (warm Egyptian gold).
 
 ### Stack
 - **Backend**: Django 5 + Django REST Framework + Django Channels (WebSockets via Redis)
 - **Frontend**: React 19 + TypeScript + Vite + Leaflet (maps) + Tailwind CSS v4
-- **Auth**: Google OAuth via django-allauth → returns DRF Token, stored in `localStorage`
-- **DB**: SQLite (dev)
+- **Map tiles**: Google Maps Tiles API (Night style for pip-boy, Retro style for desert), CartoDB fallback
+- **Auth**: Google OAuth → DRF Token, stored in `localStorage`
+- **DB**: SQLite (dev) / PostgreSQL (prod)
 
 ### Project Layout
 ```
