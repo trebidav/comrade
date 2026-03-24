@@ -140,15 +140,6 @@ export async function getGoogleTileUrl(theme: Theme): Promise<TileConfig | null>
     const data = await res.json()
     if (!data.session) return null
 
-    // Verify a tile actually loads before committing to Google tiles
-    const testUrl = `https://tile.googleapis.com/v1/2dtiles/1/0/0?session=${data.session}&key=${apiKey}`
-    try {
-      const testRes = await fetch(testUrl)
-      if (!testRes.ok) return null
-    } catch {
-      return null
-    }
-
     const url = `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${data.session}&key=${apiKey}`
     const expiry = data.expiry ? new Date(data.expiry).getTime() - 60000 : Date.now() + 23 * 3600000
     sessionCache[theme] = { url, expiresAt: expiry }
