@@ -26,6 +26,8 @@ export default function CreateTaskModal({ lat, lon, userSkills, onCreated, onClo
   const [skillRead, setSkillRead] = useState<number[]>([])
   const [skillWrite, setSkillWrite] = useState<number[]>([])
   const [skillExecute, setSkillExecute] = useState<number[]>([])
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,24 +49,25 @@ export default function CreateTaskModal({ lat, lon, userSkills, onCreated, onClo
     setSubmitting(true)
     setError('')
     try {
-      await api.post('/tasks/create', {
-        name: name.trim(),
-        description: description.trim(),
-        lat,
-        lon,
-        criticality,
-        minutes,
-        coins: coins ? Number(coins) : null,
-        xp: xp ? Number(xp) : null,
-        require_photo: requirePhoto,
-        require_comment: requireComment,
-        respawn,
-        respawn_time: respawn && !respawnOffset ? respawnTime : null,
-        respawn_offset: respawn && respawnOffset ? Number(respawnOffset) : null,
-        skill_read: skillRead,
-        skill_write: skillWrite,
-        skill_execute: skillExecute,
-      })
+      const fd = new FormData()
+      fd.append('name', name.trim())
+      fd.append('description', description.trim())
+      fd.append('lat', String(lat))
+      fd.append('lon', String(lon))
+      fd.append('criticality', String(criticality))
+      fd.append('minutes', String(minutes))
+      if (coins) fd.append('coins', coins)
+      if (xp) fd.append('xp', xp)
+      fd.append('require_photo', String(requirePhoto))
+      fd.append('require_comment', String(requireComment))
+      fd.append('respawn', String(respawn))
+      if (respawn && !respawnOffset) fd.append('respawn_time', respawnTime)
+      if (respawn && respawnOffset) fd.append('respawn_offset', respawnOffset)
+      skillRead.forEach((id) => fd.append('skill_read', String(id)))
+      skillWrite.forEach((id) => fd.append('skill_write', String(id)))
+      skillExecute.forEach((id) => fd.append('skill_execute', String(id)))
+      if (photo) fd.append('photo', photo)
+      await api.post('/tasks/create', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       onCreated()
       onClose()
     } catch (e: unknown) {
@@ -145,6 +148,29 @@ export default function CreateTaskModal({ lat, lon, userSkills, onCreated, onClo
             className="pip-input"
             style={{ resize: 'none' }}
           />
+        </div>
+
+        {/* Photo */}
+        <div style={{ marginBottom: '14px' }}>
+          <label className="pip-label">Photo</label>
+          {photoPreview && (
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <img src={photoPreview} alt="Preview" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--pip-border)' }} />
+              <button
+                onClick={() => { setPhoto(null); setPhotoPreview(null) }}
+                style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', lineHeight: '24px', textAlign: 'center' }}
+              >×</button>
+            </div>
+          )}
+          {!photoPreview && (
+            <label style={{ display: 'block', padding: '12px', border: '1px dashed var(--pip-border)', textAlign: 'center', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--pip-green-dark)' }}>
+              Tap to add photo
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) { setPhoto(file); setPhotoPreview(URL.createObjectURL(file)) }
+              }} />
+            </label>
+          )}
         </div>
 
         {/* Criticality */}

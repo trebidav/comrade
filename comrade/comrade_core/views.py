@@ -785,6 +785,7 @@ class TaskCreateView(APIView):
             return Response({"error": "Only admins can create tasks"}, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
+        _tobool = lambda v: str(v).lower() in ('true', '1', 'yes') if isinstance(v, str) else bool(v)
         name = data.get('name', '').strip()
         if not name:
             return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -798,6 +799,8 @@ class TaskCreateView(APIView):
             except (ValueError, AttributeError):
                 pass
 
+        photo = request.FILES.get('photo')
+
         task = Task(
             name=name,
             description=data.get('description', ''),
@@ -807,14 +810,16 @@ class TaskCreateView(APIView):
             minutes=data.get('minutes', 60),
             coins=data.get('coins') or None,
             xp=data.get('xp') or None,
-            respawn=bool(data.get('respawn', False)),
+            respawn=_tobool(data.get('respawn', False)),
             respawn_time=respawn_time or datetime.time(10, 0, 0),
             respawn_offset=data.get('respawn_offset') or None,
-            require_photo=data.get('require_photo', False),
-            require_comment=data.get('require_comment', False),
+            require_photo=_tobool(data.get('require_photo', False)),
+            require_comment=_tobool(data.get('require_comment', False)),
             owner=user,
             state=Task.State.OPEN,
         )
+        if photo:
+            task.photo = photo
         task.save()
 
         skill_read_ids = data.get('skill_read', [])
