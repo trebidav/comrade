@@ -859,8 +859,8 @@ function TaskDetailContent({
         )}
 
         {!task.is_tutorial && task.state === 1 && !isAssignee && canStart && !inProximity && (
-          <div style={{ padding: '10px', background: 'rgba(251,188,5,0.08)', border: '1px solid rgba(251,188,5,0.3)', fontSize: '0.8rem', color: '#FBBC05', textAlign: 'center' }}>
-            Out of proximity range
+          <div style={{ padding: '10px', background: 'rgba(184,134,11,0.08)', border: '1px solid rgba(184,134,11,0.3)', fontSize: '0.8rem', color: '#b8860b', textAlign: 'center' }}>
+            Out of range
           </div>
         )}
 
