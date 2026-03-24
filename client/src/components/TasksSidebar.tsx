@@ -110,7 +110,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const displayedTasks = view === 'active' ? activeTasks : view === 'owned' ? ownedTasks : startableTasks
 
   const tabs: { key: View; label: string; badge?: number }[] = [
-    { key: 'all', label: 'All', badge: startableTasks.length },
+    { key: 'all', label: 'Nearby', badge: startableTasks.length },
     { key: 'active', label: 'Active', badge: activeTasks.length },
     ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.state === 4).length || undefined }] : []),
   ]

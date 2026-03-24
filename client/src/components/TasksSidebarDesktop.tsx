@@ -103,10 +103,10 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
 
   const displayedTasks = view === 'active' ? activeTasks : view === 'owned' ? ownedTasks : startableTasks
 
-  const HEADER: Record<View, string> = { all: 'My Tasks', active: 'Active Tasks', owned: 'Owned Tasks' }
+  const HEADER: Record<View, string> = { all: 'Tasks', active: 'Active Tasks', owned: 'Owned Tasks' }
 
   const tabs: { key: View; label: string }[] = [
-    { key: 'all', label: 'All' },
+    { key: 'all', label: 'Nearby' },
     { key: 'active', label: activeTasks.length > 0 ? `Active (${activeTasks.length})` : 'Active' },
     ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: ownedTasks.filter((t) => t.state === 4).length > 0 ? `Owned (${ownedTasks.filter((t) => t.state === 4).length})` : 'Owned' }] : []),
   ]
