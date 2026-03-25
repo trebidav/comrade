@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "cc3ab9ffd2add54935d71b7398efc3e0bcf5d69accdc13fa59b9efa04ff530c5"
+            "sha256": "39a53d94681540d24cd9cb776175d7bcb1c2040ceaad9fe102563adbf9cedff9"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -541,12 +541,12 @@
         },
         "filelock": {
             "hashes": [
-                "sha256:521f5f56c50f8426f5e03ad3b281b490a87ef15bc6c526f168290f0c7148d44e",
-                "sha256:57dbda9b35157b05fb3e58ee91448612eb674172fab98ee235ccb0b5bee19a1c"
+                "sha256:18c57ee915c7ec61cff0ecf7f0f869936c7c30191bb0cf406f1341778d0834e1",
+                "sha256:4b0dda527ee31078689fc205ec4f1c1bf7d56cf88b6dc9426c4f230e46c2dce1"
             ],
             "index": "pypi",
-            "markers": "python_version >= '3.8'",
-            "version": "==3.13.1"
+            "markers": "python_version >= '3.10'",
+            "version": "==3.20.3"
         },
         "google-auth": {
             "hashes": [
@@ -592,6 +592,7 @@
                 "sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea",
                 "sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902"
             ],
+            "markers": "python_version >= '3.8'",
             "version": "==3.11"
         },
         "incremental": {
@@ -1170,11 +1171,12 @@
         },
         "requests": {
             "hashes": [
-                "sha256:2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6",
-                "sha256:dbba0bac56e100853db0ea71b82b4dfd5fe2bf6d3754a8893c3af500cec7d7cf"
+                "sha256:3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b",
+                "sha256:c7ebc5e8b0f21837386ad0e1c8fe8b829fa5f544d8df3b2253bff14ef29d7652"
             ],
-            "markers": "python_version >= '3.9'",
-            "version": "==2.32.5"
+            "index": "pypi",
+            "markers": "python_version >= '3.10'",
+            "version": "==2.33.0"
         },
         "requests-oauthlib": {
             "hashes": [
@@ -1218,12 +1220,12 @@
         },
         "sqlparse": {
             "hashes": [
-                "sha256:714d0a4932c059d16189f58ef5411ec2287a4360f17cdd0edd2d09d4c5087c93",
-                "sha256:c204494cd97479d0e39f28c93d46c0b2d5959c7b9ab904762ea6c7af211c8663"
+                "sha256:4396a7d3cf1cd679c1be976cf3dc6e0a51d0111e87787e7a8d780e7d5a998f9e",
+                "sha256:99a9f0314977b76d776a0fcb8554de91b9bb8a18560631d6bc48721d07023dcb"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.8'",
-            "version": "==0.5.0"
+            "version": "==0.5.4"
         },
         "twisted": {
             "extras": [
