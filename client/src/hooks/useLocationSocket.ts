@@ -80,7 +80,6 @@ interface Props {
 
 export function useLocationSocket({ token, username, userId }: Props) {
   const socketRef = useRef<WebSocket | null>(null)
-  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msgIdRef = useRef(0)
 
@@ -88,6 +87,8 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [publicUsers, setPublicUsers] = useState<Map<number, PublicLocation>>(new Map())
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const geoWatchRef = useRef<number | null>(null)
   const chatHistoryLoaded = useRef(false)
 
   // Load chat history on first mount
@@ -150,6 +151,49 @@ export function useLocationSocket({ token, username, userId }: Props) {
     [username]
   )
 
+  // ── Geolocation (independent of WebSocket) ──
+  // Start watchPosition on mount, not inside ws.onopen, to avoid Safari issues
+  // where geolocation calls from non-user-gesture callbacks may be suppressed.
+  useEffect(() => {
+    if (!token || !navigator.geolocation) return
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = pos.coords
+      setSelfLocation({ lat: latitude, lon: longitude, accuracy })
+      sendLocation(latitude, longitude, accuracy)
+      setLocationError(null)
+    }
+
+    const startWatch = (highAccuracy: boolean) => {
+      geoWatchRef.current = navigator.geolocation.watchPosition(
+        onSuccess,
+        (err) => {
+          if (highAccuracy && err.code !== err.PERMISSION_DENIED) {
+            // High-accuracy failed (timeout/unavailable) — retry without it
+            console.warn('Geolocation high-accuracy failed, retrying low-accuracy:', err.message)
+            if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current)
+            startWatch(false)
+          } else {
+            const msg = err.code === err.PERMISSION_DENIED
+              ? 'Location permission denied'
+              : err.code === err.POSITION_UNAVAILABLE
+                ? 'Location unavailable'
+                : 'Location request timed out'
+            console.warn('Geolocation error:', msg, err)
+            setLocationError(msg)
+          }
+        },
+        { enableHighAccuracy: highAccuracy, maximumAge: 5000, timeout: highAccuracy ? 15000 : 10000 },
+      )
+    }
+
+    startWatch(true)
+
+    return () => {
+      if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current)
+    }
+  }, [token, sendLocation])
+
   // Consume task updates (called by MapView after processing)
   const clearTaskUpdates = useCallback(() => setTaskUpdates([]), [])
   const clearUserStats = useCallback(() => setUserStats(null), [])
@@ -170,21 +214,6 @@ export function useLocationSocket({ token, username, userId }: Props) {
           ws.send(JSON.stringify({ type: 'heartbeat' }))
         }
       }, 5000)
-
-      // Track location — use watchPosition for better iOS Safari support
-      if (navigator.geolocation) {
-        const watchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords
-            setSelfLocation({ lat: latitude, lon: longitude, accuracy })
-            sendLocation(latitude, longitude, accuracy)
-          },
-          (err) => console.warn('Geolocation error:', err),
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-        )
-        // Store watchId for cleanup (reuse locationIntervalRef to avoid adding new ref)
-        locationIntervalRef.current = watchId as unknown as ReturnType<typeof setInterval>
-      }
     }
 
     ws.onmessage = (event) => {
@@ -345,19 +374,17 @@ export function useLocationSocket({ token, username, userId }: Props) {
     }
 
     ws.onclose = () => {
-      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
     }
 
     return () => {
-      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
       ws.close()
     }
   }, [token, sendLocation, username, userId])
 
   return {
-    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     // New real-time data
     taskUpdates, clearTaskUpdates,
     userStats, clearUserStats,
