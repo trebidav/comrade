@@ -1,5 +1,8 @@
 # Comrade: OpenSource task manager for any community. Gamified.
 
+<img width="1122" height="866" alt="Comrade-Desktop" src="https://github.com/user-attachments/assets/12a3c7fa-514d-4a06-b6c9-aebdce025f55" />
+
+
 ### Main idea
 
 Comrade App is a community-driven task management platform designed to empower users by organizing and coordinating execution of location-based tasks. With real-time updates and skill-based task assignments, it enhances collaboration, streamlines task management, and fosters active community involvement.
@@ -25,9 +28,6 @@ Using an interactive map, users can easily locate tasks that align with their sk
 - Gamification elements introduce rewards, achievements, and game-like features to create a more engaging user experience
 - Reward system
 
-# MVP – Looking for contributors!
-
-First milestone is to reach MVP stage by implementing the minimal required functionality so the application can be demonstrated in a very simplified way.
 
 ## Basic functionality
 
@@ -43,13 +43,6 @@ First milestone is to reach MVP stage by implementing the minimal required funct
 Issues that should be addressed in the MVP are tracked in the milestone:
 
 https://github.com/trebidav/comrade/milestone/1
-
-## Contributing
-
-**Currently looking for contributors!** 
-- Django & Django-rest framework developers
-- JavaScript & React developers
-- Software Architects and Game Designers
 
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
