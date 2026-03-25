@@ -171,21 +171,19 @@ export function useLocationSocket({ token, username, userId }: Props) {
         }
       }, 5000)
 
-      // Send location every 5s
+      // Track location — use watchPosition for better iOS Safari support
       if (navigator.geolocation) {
-        const sendGeo = () => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const { latitude, longitude, accuracy } = pos.coords
-              setSelfLocation({ lat: latitude, lon: longitude, accuracy })
-              sendLocation(latitude, longitude, accuracy)
-            },
-            (err) => console.warn('Geolocation error:', err),
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-          )
-        }
-        sendGeo()
-        locationIntervalRef.current = setInterval(sendGeo, 5000)
+        const watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords
+            setSelfLocation({ lat: latitude, lon: longitude, accuracy })
+            sendLocation(latitude, longitude, accuracy)
+          },
+          (err) => console.warn('Geolocation error:', err),
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        )
+        // Store watchId for cleanup (reuse locationIntervalRef to avoid adding new ref)
+        locationIntervalRef.current = watchId as unknown as ReturnType<typeof setInterval>
       }
     }
 
@@ -347,12 +345,12 @@ export function useLocationSocket({ token, username, userId }: Props) {
     }
 
     ws.onclose = () => {
-      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current)
+      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
     }
 
     return () => {
-      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current)
+      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
       ws.close()
     }
