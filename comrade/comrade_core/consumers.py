@@ -120,7 +120,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         'type': 'chat_message',
                         'message': message,
                         'sender': sender,
-                        'msg_id': msg_id,
+                        'msgId': msg_id,
                         'timestamp': timestamp,
                     }
                 )
@@ -158,7 +158,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     'timestamp': timezone.now().isoformat(),
                     'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
                     'skills': skills,
-                    'profile_picture': self.user.profile_picture or '',
+                    'profilePicture': self.user.profile_picture or '',
                 }
 
                 # Send detailed update to all friends - assume they're all active
@@ -229,7 +229,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
             'friends': event['friends'],
             'skills': event['skills'],
-            'profile_picture': event.get('profile_picture', ''),
+            'profilePicture': event.get('profilePicture', ''),
         }))
 
     async def public_location(self, event):
@@ -286,7 +286,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'type': 'chat_message',
             'message': event['message'],
             'sender': event['sender'],
-            'msg_id': event.get('msg_id'),
+            'msgId': event.get('msgId'),
             'timestamp': event.get('timestamp'),
         }))
 

@@ -20,7 +20,7 @@ def send_friend_request(request, user_id):
         request.user.send_friend_request(target_user)
         send_friend_event(target_user.id, {
             'type': 'friend_request_received',
-            'from_user': {'id': request.user.id, 'username': request.user.username},
+            'fromUser': {'id': request.user.id, 'username': request.user.username},
         })
         return Response({'message': 'Friend request sent'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -91,7 +91,7 @@ def reject_friend_request(request, user_id):
         request.user.reject_friend_request(target_user)
         send_friend_event(target_user.id, {
             'type': 'friend_request_rejected',
-            'user_id': request.user.id,
+            'userId': request.user.id,
         })
         return Response({'message': 'Friend request rejected'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -107,7 +107,7 @@ def remove_friend(request, user_id):
         request.user.remove_friend(target_user)
         send_friend_event(target_user.id, {
             'type': 'friend_removed',
-            'user_id': request.user.id,
+            'userId': request.user.id,
         })
         return Response({'message': 'Friend removed'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:

@@ -74,8 +74,8 @@ export default function FriendRequestsModal({
       switch (evt.type) {
         case 'friend_request_received':
           setRequests((prev) => {
-            if (prev.some((r) => r.id === evt.from_user.id)) return prev
-            return [...prev, { id: evt.from_user.id, username: evt.from_user.username, email: '' }]
+            if (prev.some((r) => r.id === evt.fromUser.id)) return prev
+            return [...prev, { id: evt.fromUser.id, username: evt.fromUser.username, email: '' }]
           })
           break
         case 'friend_request_accepted':
@@ -86,10 +86,10 @@ export default function FriendRequestsModal({
           setRequests((prev) => prev.filter((r) => r.id !== evt.user.id))
           break
         case 'friend_removed':
-          setFriends((prev) => prev.filter((f) => f.id !== evt.user_id))
+          setFriends((prev) => prev.filter((f) => f.id !== evt.userId))
           break
         case 'friend_request_rejected':
-          setRequests((prev) => prev.filter((r) => r.id !== evt.user_id))
+          setRequests((prev) => prev.filter((r) => r.id !== evt.userId))
           break
       }
     }

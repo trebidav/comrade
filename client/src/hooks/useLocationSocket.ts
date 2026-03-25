@@ -37,25 +37,25 @@ export interface ChatMessage {
 // ── New real-time event interfaces ──
 
 export interface TaskUpdateEvent {
-  task_id: number
+  taskId: number
   state: number
   assignee: number | null
-  assignee_name: string | null
+  assigneeName: string | null
   owner: number | null
-  datetime_start: string | null
-  datetime_finish: string | null
-  datetime_paused: string | null
+  datetimeStart: string | null
+  datetimeFinish: string | null
+  datetimePaused: string | null
   action: string
 }
 
 export interface UserStatsEvent {
   coins: number
   xp: number
-  total_coins_earned: number
-  total_xp_earned: number
-  task_streak: number
+  totalCoinsEarned: number
+  totalXpEarned: number
+  taskStreak: number
   level: number
-  level_progress: { level: number; current_xp: number; required_xp: number }
+  levelProgress: { level: number; current_xp: number; required_xp: number }
   skills: string[]
 }
 
@@ -67,10 +67,10 @@ export interface WsAchievement {
 }
 
 export type FriendEvent =
-  | { type: 'friend_request_received'; from_user: { id: number; username: string } }
+  | { type: 'friend_request_received'; fromUser: { id: number; username: string } }
   | { type: 'friend_request_accepted'; user: { id: number; username: string } }
-  | { type: 'friend_request_rejected'; user_id: number }
-  | { type: 'friend_removed'; user_id: number }
+  | { type: 'friend_request_rejected'; userId: number }
+  | { type: 'friend_removed'; userId: number }
 
 interface Props {
   token: string | null
@@ -215,7 +215,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 accuracy: data.accuracy ?? 0,
                 friends: data.friends ?? [],
                 skills: data.skills ?? [],
-                profilePicture: data.profile_picture ?? '',
+                profilePicture: data.profilePicture ?? '',
               })
               return next
             })
@@ -239,7 +239,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 lat: data.latitude,
                 lon: data.longitude,
                 accuracy: data.accuracy ?? 0,
-                profilePicture: data.profile_picture ?? '',
+                profilePicture: data.profilePicture ?? '',
               })
               return next
             })
@@ -284,18 +284,18 @@ export function useLocationSocket({ token, username, userId }: Props) {
 
           case 'chat_message': {
             const sender = data.sender ?? 'Unknown'
-            const id = data.msg_id ?? ++msgIdRef.current
+            const id = data.msgId ?? ++msgIdRef.current
             if (sender !== username) {
               setChatMessages((prev) => [
                 ...prev,
                 { id, text: data.message, sender, isSelf: false },
               ])
-            } else if (data.msg_id) {
+            } else if (data.msgId) {
               // Replace the optimistic message with the server-confirmed one
               setChatMessages((prev) => {
                 const last = prev[prev.length - 1]
                 if (last?.isSelf && last.text === data.message && last.id < 0) {
-                  return [...prev.slice(0, -1), { ...last, id: data.msg_id }]
+                  return [...prev.slice(0, -1), { ...last, id: data.msgId }]
                 }
                 return prev
               })

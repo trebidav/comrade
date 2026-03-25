@@ -23,14 +23,14 @@ def send_task_update(task, action: str, exclude_user_id: int | None = None):
     """Broadcast task state change to owner and assignee (excluding the actor)."""
     event = {
         "type": "task_update",
-        "task_id": task.id,
+        "taskId": task.id,
         "state": task.state,
         "assignee": task.assignee_id,
-        "assignee_name": _display_name(task.assignee) if task.assignee else None,
+        "assigneeName": _display_name(task.assignee) if task.assignee else None,
         "owner": task.owner_id,
-        "datetime_start": task.datetime_start.isoformat() if task.datetime_start else None,
-        "datetime_finish": task.datetime_finish.isoformat() if task.datetime_finish else None,
-        "datetime_paused": task.datetime_paused.isoformat() if task.datetime_paused else None,
+        "datetimeStart": task.datetime_start.isoformat() if task.datetime_start else None,
+        "datetimeFinish": task.datetime_finish.isoformat() if task.datetime_finish else None,
+        "datetimePaused": task.datetime_paused.isoformat() if task.datetime_paused else None,
         "action": action,
     }
     recipients = set()
@@ -50,11 +50,11 @@ def send_user_stats(user):
         "type": "user_stats_update",
         "coins": float(user.coins),
         "xp": float(user.xp),
-        "total_coins_earned": float(user.total_coins_earned),
-        "total_xp_earned": float(user.total_xp_earned),
-        "task_streak": user.task_streak,
+        "totalCoinsEarned": float(user.total_coins_earned),
+        "totalXpEarned": float(user.total_xp_earned),
+        "taskStreak": user.task_streak,
         "level": user.level,
-        "level_progress": user.level_progress,
+        "levelProgress": user.level_progress,
         "skills": list(user.skills.values_list('name', flat=True)),
     }
     _send_to_user(user.id, event)
