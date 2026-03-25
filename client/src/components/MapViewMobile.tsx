@@ -269,7 +269,7 @@ export default function MapView({ user, onLogout }: Props) {
   }, [])
 
   const {
-    friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
+    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
     taskUpdates, clearTaskUpdates, userStats, clearUserStats,
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
   } = useLocationSocket({
