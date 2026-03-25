@@ -86,7 +86,7 @@ export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendE
         {/* User header */}
         <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--glass-border)' }}>
           <div style={{ fontSize: '0.55rem', letterSpacing: '0.12em', color: 'var(--pip-green)', textTransform: 'uppercase', marginBottom: '14px' }}>
-            COMRADE v0.1.0-beta
+            COMRADE {__COMMIT_HASH__}
           </div>
 
           {/* Avatar + username row */}

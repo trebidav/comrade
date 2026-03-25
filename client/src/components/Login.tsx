@@ -203,7 +203,7 @@ export default function Login({ onLogin }: Props) {
 
         <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', letterSpacing: '0.08em' }}>
-            comrade-0.1.0-beta
+            comrade-{__COMMIT_HASH__}
           </div>
         </div>
       </div>

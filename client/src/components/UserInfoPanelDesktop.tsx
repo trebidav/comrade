@@ -81,7 +81,7 @@ export default function UserInfoPanel({ user, onLogout, onlineFriendIds, friendE
             marginBottom: '8px',
           }}
         >
-          COMRADE v0.1.0-beta
+          COMRADE {__COMMIT_HASH__}
         </div>
 
         <div style={{ fontSize: '0.8rem', marginBottom: '2px', color: 'var(--pip-text)' }}>
