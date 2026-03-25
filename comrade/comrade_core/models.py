@@ -573,21 +573,28 @@ class Task(models.Model):
 
     @classmethod
     def check_and_reset_stale(cls):
-        """Abandon WAITING tasks that have been paused longer than their estimated minutes × pause_multiplier."""
+        """Abandon WAITING tasks that have been paused longer than their estimated minutes x pause_multiplier."""
+        from datetime import timedelta as _td
+        from django.db.models import F, ExpressionWrapper, DurationField
         config = LocationConfig.get_config()
-        stale = cls.objects.filter(
+        cutoff = ExpressionWrapper(
+            _td(minutes=1) * F('minutes') * config.pause_multiplier,
+            output_field=DurationField(),
+        )
+        cls.objects.filter(
             state=cls.State.WAITING,
             datetime_paused__isnull=False,
-        ).select_related('assignee')
-        for task in stale:
-            paused_minutes = (now() - task.datetime_paused).total_seconds() / 60
-            if paused_minutes >= task.minutes * config.pause_multiplier:
-                task.state = cls.State.OPEN
-                task.assignee = None
-                task.datetime_start = None
-                task.datetime_paused = None
-                task.time_spent_minutes = None
-                task.save(update_fields=['state', 'assignee', 'datetime_start', 'datetime_paused', 'time_spent_minutes'])
+        ).annotate(
+            max_pause=cutoff,
+        ).filter(
+            datetime_paused__lte=now() - F('max_pause'),
+        ).update(
+            state=cls.State.OPEN,
+            assignee=None,
+            datetime_start=None,
+            datetime_paused=None,
+            time_spent_minutes=None,
+        )
 
     def debug_reset(self):
         """Debug method to reset task to OPEN state"""
