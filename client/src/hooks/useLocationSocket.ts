@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import * as Sentry from '@sentry/react'
 import api from '../api'
 
 export interface FriendLocation {
@@ -181,6 +182,10 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 : 'Location request timed out'
             console.warn('Geolocation error:', msg, err)
             setLocationError(msg)
+            Sentry.captureMessage(`Geolocation: ${msg}`, {
+              level: 'warning',
+              extra: { code: err.code, message: err.message, highAccuracy },
+            })
           }
         },
         { enableHighAccuracy: highAccuracy, maximumAge: 5000, timeout: highAccuracy ? 15000 : 10000 },
