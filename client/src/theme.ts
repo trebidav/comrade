@@ -136,7 +136,7 @@ export async function getGoogleTileUrl(theme: Theme): Promise<TileConfig | null>
   }
 
   // Deduplicate: if a request for this theme is already in-flight, reuse it
-  if (inflightRequests[theme]) return inflightRequests[theme]
+  if (theme in inflightRequests) return inflightRequests[theme]
 
   const request = (async (): Promise<TileConfig | null> => {
     try {
