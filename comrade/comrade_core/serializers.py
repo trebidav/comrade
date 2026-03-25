@@ -53,7 +53,19 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = "__all__"
+        fields = [
+            'id', 'name', 'description', 'lat', 'lon',
+            'state', 'criticality', 'minutes', 'coins', 'xp',
+            'owner', 'assignee', 'photo',
+            'require_photo', 'require_comment',
+            'datetime_start', 'datetime_finish', 'datetime_paused',
+            'respawn', 'respawn_time', 'respawn_offset', 'datetime_respawn',
+            'time_spent_minutes',
+            # SerializerMethodFields
+            'skill_execute_names', 'skill_read_names', 'skill_write_names',
+            'assignee_name', 'pending_review', 'is_tutorial',
+        ]
+        # NOTE: New Task model fields must be added here to appear in API responses.
 
 
 class SkillSerializer(serializers.ModelSerializer):
