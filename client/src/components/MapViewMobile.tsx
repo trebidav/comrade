@@ -431,11 +431,6 @@ export default function MapView({ user, onLogout }: Props) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
-      {/* DEBUG: Geolocation status banner — REMOVE AFTER DEBUGGING */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9999, padding: '4px 8px', fontSize: '11px', fontFamily: 'monospace', background: locationError ? '#e74c3c' : selfLocation ? '#27ae60' : '#f39c12', color: '#fff', textAlign: 'center' }}>
-        {locationError ? `GEO ERROR: ${locationError}` : selfLocation ? `GEO OK: ${selfLocation.lat.toFixed(5)}, ${selfLocation.lon.toFixed(5)}` : 'GEO: waiting...'}
-        {' | '}UA: {navigator.userAgent.slice(-40)}
-      </div>
       {/* Map */}
       <div style={{ width: '100%', height: '100%', filter: tileConfig.filter }}>
         <MapContainer
