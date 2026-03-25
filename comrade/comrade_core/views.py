@@ -727,9 +727,9 @@ class AchievementsView(APIView):
 
     def get(self, request):
         user = request.user
-        earned_map = {ua.achievement_id: ua for ua in user.user_achievements.all()}
+        earned_map = {ua.achievement_id: ua for ua in user.user_achievements.select_related('achievement').all()}
         data = []
-        for achievement in Achievement.objects.filter(is_active=True):
+        for achievement in Achievement.objects.filter(is_active=True).select_related('reward_skill'):
             ua = earned_map.get(achievement.id)
             earned = ua is not None
             if achievement.is_secret and not earned:
