@@ -29,8 +29,6 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.db import models
 
-User = get_user_model()
-
 
 def index(request):
     return render(request, "index.html")
