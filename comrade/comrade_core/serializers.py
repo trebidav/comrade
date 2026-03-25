@@ -1,3 +1,5 @@
+import datetime
+
 from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
 from rest_framework import serializers
 
@@ -66,6 +68,57 @@ class TaskSerializer(serializers.ModelSerializer):
             'assignee_name', 'pending_review', 'is_tutorial',
         ]
         # NOTE: New Task model fields must be added here to appear in API responses.
+
+
+class TaskCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=64, required=True)
+    description = serializers.CharField(max_length=200, required=False, default='', allow_blank=True)
+    lat = serializers.FloatField(required=False, allow_null=True, default=None)
+    lon = serializers.FloatField(required=False, allow_null=True, default=None)
+    criticality = serializers.IntegerField(required=False, default=1, min_value=1, max_value=3)
+    minutes = serializers.IntegerField(required=False, default=10, min_value=1, max_value=480)
+    coins = serializers.FloatField(required=False, allow_null=True, default=None, min_value=0, max_value=1)
+    xp = serializers.FloatField(required=False, allow_null=True, default=None, min_value=0, max_value=1)
+    respawn = serializers.BooleanField(required=False, default=False)
+    respawn_time = serializers.CharField(required=False, default='10:00', allow_blank=True)
+    respawn_offset = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
+    require_photo = serializers.BooleanField(required=False, default=False)
+    require_comment = serializers.BooleanField(required=False, default=False)
+    photo = serializers.FileField(required=False, allow_null=True, default=None)
+    skill_read = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+    skill_write = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+    skill_execute = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+
+    def validate_lat(self, value):
+        if value is not None and not (-90 <= value <= 90):
+            raise serializers.ValidationError("Must be between -90 and 90.")
+        return value
+
+    def validate_lon(self, value):
+        if value is not None and not (-180 <= value <= 180):
+            raise serializers.ValidationError("Must be between -180 and 180.")
+        return value
+
+    def validate_respawn_time(self, value):
+        if not value:
+            return datetime.time(10, 0)
+        try:
+            h, m = value.split(':')
+            return datetime.time(int(h), int(m))
+        except (ValueError, AttributeError):
+            raise serializers.ValidationError("Must be in HH:MM format.")
+
+    def validate_coins(self, value):
+        """Handle empty string from FormData."""
+        if value == '' or value is None:
+            return None
+        return value
+
+    def validate_xp(self, value):
+        """Handle empty string from FormData."""
+        if value == '' or value is None:
+            return None
+        return value
 
 
 class SkillSerializer(serializers.ModelSerializer):

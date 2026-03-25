@@ -403,6 +403,23 @@ class TaskAPITest(APITestCase):
         resp = self.client.post('/api/tasks/create', {'name': 'new task', 'lat': 50.0, 'lon': 14.0})
         self.assertEqual(resp.status_code, 201)
 
+    def test_create_task_validation_empty_name(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.owner_token.key)
+        self.owner.is_staff = True
+        self.owner.save()
+        resp = self.client.post('/api/tasks/create', {'name': '', 'lat': 50.0, 'lon': 14.0})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('fields', resp.data)
+        self.assertIn('name', resp.data['fields'])
+
+    def test_create_task_validation_invalid_lat(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.owner_token.key)
+        self.owner.is_staff = True
+        self.owner.save()
+        resp = self.client.post('/api/tasks/create', {'name': 'test', 'lat': 999, 'lon': 14.0})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('fields', resp.data)
+
 
 class FriendsAPITest(APITestCase):
     def setUp(self):

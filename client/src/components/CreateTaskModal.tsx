@@ -71,8 +71,15 @@ export default function CreateTaskModal({ lat, lon, userSkills, onCreated, onClo
       onCreated()
       onClose()
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      setError(msg || 'Failed to create task')
+      const resp = (e as { response?: { data?: { error?: string; fields?: Record<string, string[]> } } })?.response?.data
+      if (resp?.fields) {
+        // Show first field error
+        const firstField = Object.keys(resp.fields)[0]
+        const firstError = resp.fields[firstField]
+        setError(`${firstField}: ${Array.isArray(firstError) ? firstError[0] : firstError}`)
+      } else {
+        setError(resp?.error || 'Failed to create task')
+      }
     } finally {
       setSubmitting(false)
     }

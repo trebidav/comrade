@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import Task, Rating, Review, Skill, LocationConfig, TutorialTask, TutorialProgress
-from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer
+from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
 from ..ws_events import send_task_update, send_user_stats, send_achievements
 
@@ -295,57 +295,44 @@ class TaskCreateView(APIView):
         if not (user.is_superuser or user.is_staff):
             return Response({"error": "Only admins can create tasks"}, status=status.HTTP_403_FORBIDDEN)
 
-        data = request.data
-        _tobool = lambda v: str(v).lower() in ('true', '1', 'yes') if isinstance(v, str) else bool(v)
-        name = data.get('name', '').strip()
-        if not name:
-            return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = TaskCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Validation failed", "fields": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        respawn_time_raw = data.get('respawn_time')
-        respawn_time = None
-        if respawn_time_raw:
-            try:
-                h, m = str(respawn_time_raw).split(':')
-                respawn_time = datetime.time(int(h), int(m))
-            except (ValueError, AttributeError):
-                pass
-
-        photo = request.FILES.get('photo')
-
+        data = serializer.validated_data
         task = Task(
-            name=name,
-            description=data.get('description', ''),
-            lat=data.get('lat'),
-            lon=data.get('lon'),
-            criticality=data.get('criticality', Task.Criticality.LOW),
-            minutes=data.get('minutes', 60),
-            coins=data.get('coins') or None,
-            xp=data.get('xp') or None,
-            respawn=_tobool(data.get('respawn', False)),
-            respawn_time=respawn_time or datetime.time(10, 0, 0),
-            respawn_offset=data.get('respawn_offset') or None,
-            require_photo=_tobool(data.get('require_photo', False)),
-            require_comment=_tobool(data.get('require_comment', False)),
+            name=data['name'],
+            description=data['description'],
+            lat=data['lat'],
+            lon=data['lon'],
+            criticality=data['criticality'],
+            minutes=data['minutes'],
+            coins=data['coins'],
+            xp=data['xp'],
+            respawn=data['respawn'],
+            respawn_time=data['respawn_time'],
+            respawn_offset=data['respawn_offset'],
+            require_photo=data['require_photo'],
+            require_comment=data['require_comment'],
             owner=user,
             state=Task.State.OPEN,
         )
-        if photo:
-            task.photo = photo
+        if data.get('photo'):
+            task.photo = data['photo']
         task.save()
 
-        skill_read_ids = data.get('skill_read', [])
-        skill_write_ids = data.get('skill_write', [])
-        skill_execute_ids = data.get('skill_execute', [])
+        if data['skill_read']:
+            task.skill_read.set(data['skill_read'])
+        if data['skill_write']:
+            task.skill_write.set(data['skill_write'])
+        if data['skill_execute']:
+            task.skill_execute.set(data['skill_execute'])
 
-        if skill_read_ids:
-            task.skill_read.set(Skill.objects.filter(id__in=skill_read_ids))
-        if skill_write_ids:
-            task.skill_write.set(Skill.objects.filter(id__in=skill_write_ids))
-        if skill_execute_ids:
-            task.skill_execute.set(Skill.objects.filter(id__in=skill_execute_ids))
-
-        serializer = TaskSerializer(task, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        response_serializer = TaskSerializer(task, context={'request': request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 def _serialize_achievements(achievements: list) -> list:
