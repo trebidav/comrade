@@ -30,7 +30,7 @@ from django.utils.decorators import method_decorator
 import json
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from django.db import models
+from django.db import models, transaction
 
 
 def index(request):
@@ -116,25 +116,25 @@ class TaskStartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        task = None
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist as e:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        if task.lat is not None and task.lon is not None:
-            config = LocationConfig.get_config()
-            distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
-            if distance_km > config.task_proximity_km:
-                return Response(
-                    {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
-                    status=status.HTTP_412_PRECONDITION_FAILED,
-                )
+            if task.lat is not None and task.lon is not None:
+                config = LocationConfig.get_config()
+                distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
+                if distance_km > config.task_proximity_km:
+                    return Response(
+                        {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
+                        status=status.HTTP_412_PRECONDITION_FAILED,
+                    )
 
-        try:
-            task.start(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+            try:
+                task.start(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
         send_task_update(task, action='start', exclude_user_id=request.user.id)
         return Response(
@@ -146,28 +146,29 @@ class TaskFinishView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        photo = request.FILES.get('photo')
-        comment = request.data.get('comment', '')
+            photo = request.FILES.get('photo')
+            comment = request.data.get('comment', '')
 
-        if task.require_photo and not photo:
-            return Response({"error": "A photo is required to finish this task"}, status=status.HTTP_400_BAD_REQUEST)
-        if task.require_comment and not comment.strip():
-            return Response({"error": "A comment is required to finish this task"}, status=status.HTTP_400_BAD_REQUEST)
+            if task.require_photo and not photo:
+                return Response({"error": "A photo is required to finish this task"}, status=status.HTTP_400_BAD_REQUEST)
+            if task.require_comment and not comment.strip():
+                return Response({"error": "A comment is required to finish this task"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            task.finish(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+            try:
+                task.finish(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
-        review = Review(task=task, comment=comment)
-        if photo:
-            review.photo = photo
-        review.save()
+            review = Review(task=task, comment=comment)
+            if photo:
+                review.photo = photo
+            review.save()
 
         send_task_update(task, action='finish', exclude_user_id=request.user.id)
         return Response({"message": "Task finished!"}, status=status.HTTP_200_OK)
@@ -201,16 +202,16 @@ class TaskPauseView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        task = None
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist as e:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            task.pause(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+            try:
+                task.pause(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
         send_task_update(task, action='pause', exclude_user_id=request.user.id)
         return Response(
@@ -222,25 +223,25 @@ class TaskResumeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        task = None
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist as e:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        if task.lat is not None and task.lon is not None:
-            config = LocationConfig.get_config()
-            distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
-            if distance_km > config.task_proximity_km:
-                return Response(
-                    {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
-                    status=status.HTTP_412_PRECONDITION_FAILED,
-                )
+            if task.lat is not None and task.lon is not None:
+                config = LocationConfig.get_config()
+                distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
+                if distance_km > config.task_proximity_km:
+                    return Response(
+                        {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
+                        status=status.HTTP_412_PRECONDITION_FAILED,
+                    )
 
-        try:
-            task.resume(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+            try:
+                task.resume(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
         send_task_update(task, action='resume', exclude_user_id=request.user.id)
         return Response(
@@ -285,14 +286,15 @@ class TaskAbandonView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
-        try:
-            task.abandon(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                task.abandon(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
         send_task_update(task, action='abandon', exclude_user_id=request.user.id)
         return Response({"message": "Task abandoned."}, status=status.HTTP_200_OK)
 
@@ -301,16 +303,17 @@ class TaskAcceptReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
-        try:
-            new_achievements = task.accept_review(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
-        earned_coins = task.coins if task.coins is not None else 0
-        earned_xp = task.xp if task.xp is not None else 0
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                new_achievements = task.accept_review(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+            earned_coins = task.coins if task.coins is not None else 0
+            earned_xp = task.xp if task.xp is not None else 0
 
         send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
         # Push stats and achievements to the ASSIGNEE (not the owner who called this)
@@ -331,14 +334,15 @@ class TaskDeclineReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, taskId: int):
-        try:
-            task = Task.objects.get(pk=taskId)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
-        try:
-            task.decline_review(request.user)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(pk=taskId)
+            except Task.DoesNotExist:
+                return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                task.decline_review(request.user)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
         send_task_update(task, action='decline_review', exclude_user_id=request.user.id)
         return Response({"message": "Review declined, task reset to open."}, status=status.HTTP_200_OK)
 
