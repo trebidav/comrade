@@ -1,6 +1,9 @@
 import json
+import logging
 from datetime import timedelta
 from urllib.parse import parse_qs
+
+logger = logging.getLogger(__name__)
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -140,7 +143,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
             # Save location regardless of sharing preferences
             await self.save_user_location(self.user, latitude, longitude)
-            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude} profile_picture={self.user.profile_picture!r}")
+            logger.debug("[%s] Location saved for %s at %s, %s profile_picture=%r", timezone.now(), self.user.username, latitude, longitude, self.user.profile_picture)
 
             # Only proceed with sharing if not set to NONE
             if self.user.location_sharing_level != User.SharingLevel.NONE:
@@ -167,7 +170,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         friend_update
                     )
                 
-                print(f"[{timezone.now()}] Broadcasting location to {friend_count} friends for {self.user.username}")
+                logger.debug("[%s] Broadcasting location to %d friends for %s", timezone.now(), friend_count, self.user.username)
 
                 # If sharing level is ALL, send basic info to all non-friend users
                 if self.user.location_sharing_level == User.SharingLevel.ALL:
@@ -196,7 +199,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                             public_update
                         )
                     
-                    print(f"[{timezone.now()}] Broadcasting location to {public_count} public users for {self.user.username}")
+                    logger.debug("[%s] Broadcasting location to %d public users for %s", timezone.now(), public_count, self.user.username)
                     
     async def update_preferences(self, preferences_data):
         """Update user's location sharing preferences"""

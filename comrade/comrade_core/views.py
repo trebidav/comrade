@@ -1,6 +1,9 @@
 import datetime
+import logging
 import urllib.parse
 import urllib.request
+
+logger = logging.getLogger(__name__)
 from comrade_core.models import Task, ChatMessage
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -267,7 +270,7 @@ class TaskListView(APIView):
         
         # For debugging: count tasks that have location data
         tasks_with_location = tasks.exclude(lat__isnull=True).exclude(lon__isnull=True).count()
-        print(f"Found {tasks.count()} tasks for user {user} ({tasks_with_location} with location)")
+        logger.debug("Found %d tasks for user %s (%d with location)", tasks.count(), user, tasks_with_location)
         
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
