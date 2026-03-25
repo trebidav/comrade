@@ -1,11 +1,20 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # .env lives in the deploy root (one level above manage.py / BASE_DIR)
 load_dotenv(BASE_DIR.parent / '.env')
+
+try:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn="https://jGUipzDiu5LxADJpRL19iW2M@s2320878.eu-fsn-3.betterstackdata.com/2320878",
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+except ImportError:
+    pass
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-t(rozl)sf7o$37&8iyu+)^50w5%h&3=u_-19@%mnmi*2f1@m8&')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'

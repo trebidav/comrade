@@ -1,27 +1,8 @@
+import datetime
+
 from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
-from django.contrib.auth.models import Group
-from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = User
-        fields = ["url", "username", "email", "groups"]
-
-
-class GroupSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = Group
-        fields = ["url", "name"]
-
-
-class TaskSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = Task
-        fields = ["title"]
-
-User = get_user_model()
 
 class UserDetailSerializer(serializers.ModelSerializer):
     skills = serializers.StringRelatedField(many=True)
@@ -65,14 +46,79 @@ class TaskSerializer(serializers.ModelSerializer):
         return False
 
     def get_pending_review(self, obj):
-        review = obj.reviews.filter(status='pending').order_by('-created_at').first()
-        if review:
-            return PendingReviewSerializer(review, context=self.context).data
+        # Filter in Python over prefetched reviews to avoid extra queries
+        pending = [r for r in obj.reviews.all() if r.status == 'pending']
+        if pending:
+            pending.sort(key=lambda r: r.created_at, reverse=True)
+            return PendingReviewSerializer(pending[0], context=self.context).data
         return None
 
     class Meta:
         model = Task
-        fields = "__all__"
+        fields = [
+            'id', 'name', 'description', 'lat', 'lon',
+            'state', 'criticality', 'minutes', 'coins', 'xp',
+            'owner', 'assignee', 'photo',
+            'require_photo', 'require_comment',
+            'datetime_start', 'datetime_finish', 'datetime_paused',
+            'respawn', 'respawn_time', 'respawn_offset', 'datetime_respawn',
+            'time_spent_minutes',
+            # SerializerMethodFields
+            'skill_execute_names', 'skill_read_names', 'skill_write_names',
+            'assignee_name', 'pending_review', 'is_tutorial',
+        ]
+        # NOTE: New Task model fields must be added here to appear in API responses.
+
+
+class TaskCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=64, required=True)
+    description = serializers.CharField(max_length=200, required=False, default='', allow_blank=True)
+    lat = serializers.FloatField(required=False, allow_null=True, default=None)
+    lon = serializers.FloatField(required=False, allow_null=True, default=None)
+    criticality = serializers.IntegerField(required=False, default=1, min_value=1, max_value=3)
+    minutes = serializers.IntegerField(required=False, default=10, min_value=1, max_value=480)
+    coins = serializers.FloatField(required=False, allow_null=True, default=None, min_value=0, max_value=1)
+    xp = serializers.FloatField(required=False, allow_null=True, default=None, min_value=0, max_value=1)
+    respawn = serializers.BooleanField(required=False, default=False)
+    respawn_time = serializers.CharField(required=False, default='10:00', allow_blank=True)
+    respawn_offset = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
+    require_photo = serializers.BooleanField(required=False, default=False)
+    require_comment = serializers.BooleanField(required=False, default=False)
+    photo = serializers.FileField(required=False, allow_null=True, default=None)
+    skill_read = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+    skill_write = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+    skill_execute = serializers.PrimaryKeyRelatedField(many=True, queryset=Skill.objects.all(), required=False, default=[])
+
+    def validate_lat(self, value):
+        if value is not None and not (-90 <= value <= 90):
+            raise serializers.ValidationError("Must be between -90 and 90.")
+        return value
+
+    def validate_lon(self, value):
+        if value is not None and not (-180 <= value <= 180):
+            raise serializers.ValidationError("Must be between -180 and 180.")
+        return value
+
+    def validate_respawn_time(self, value):
+        if not value:
+            return datetime.time(10, 0)
+        try:
+            h, m = value.split(':')
+            return datetime.time(int(h), int(m))
+        except (ValueError, AttributeError):
+            raise serializers.ValidationError("Must be in HH:MM format.")
+
+    def validate_coins(self, value):
+        """Handle empty string from FormData."""
+        if value == '' or value is None:
+            return None
+        return value
+
+    def validate_xp(self, value):
+        """Handle empty string from FormData."""
+        if value == '' or value is None:
+            return None
+        return value
 
 
 class SkillSerializer(serializers.ModelSerializer):
@@ -157,6 +203,10 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
         return [s.name for s in obj.skill_execute.all()]
 
     def get_in_progress(self, obj):
+        in_progress_ids = self.context.get('in_progress_ids')
+        if in_progress_ids is not None:
+            return obj.pk in in_progress_ids
+        # Fallback for non-list contexts (e.g. detail views)
         request = self.context.get('request')
         if not request:
             return False

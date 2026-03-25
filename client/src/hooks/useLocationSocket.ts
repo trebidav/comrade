@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import * as Sentry from '@sentry/react'
 import api from '../api'
 
 export interface FriendLocation {
@@ -37,25 +38,25 @@ export interface ChatMessage {
 // ── New real-time event interfaces ──
 
 export interface TaskUpdateEvent {
-  task_id: number
+  taskId: number
   state: number
   assignee: number | null
-  assignee_name: string | null
+  assigneeName: string | null
   owner: number | null
-  datetime_start: string | null
-  datetime_finish: string | null
-  datetime_paused: string | null
+  datetimeStart: string | null
+  datetimeFinish: string | null
+  datetimePaused: string | null
   action: string
 }
 
 export interface UserStatsEvent {
   coins: number
   xp: number
-  total_coins_earned: number
-  total_xp_earned: number
-  task_streak: number
+  totalCoinsEarned: number
+  totalXpEarned: number
+  taskStreak: number
   level: number
-  level_progress: { level: number; current_xp: number; required_xp: number }
+  levelProgress: { level: number; current_xp: number; required_xp: number }
   skills: string[]
 }
 
@@ -67,10 +68,10 @@ export interface WsAchievement {
 }
 
 export type FriendEvent =
-  | { type: 'friend_request_received'; from_user: { id: number; username: string } }
+  | { type: 'friend_request_received'; fromUser: { id: number; username: string } }
   | { type: 'friend_request_accepted'; user: { id: number; username: string } }
-  | { type: 'friend_request_rejected'; user_id: number }
-  | { type: 'friend_removed'; user_id: number }
+  | { type: 'friend_request_rejected'; userId: number }
+  | { type: 'friend_removed'; userId: number }
 
 interface Props {
   token: string | null
@@ -80,7 +81,6 @@ interface Props {
 
 export function useLocationSocket({ token, username, userId }: Props) {
   const socketRef = useRef<WebSocket | null>(null)
-  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msgIdRef = useRef(0)
 
@@ -88,6 +88,8 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [publicUsers, setPublicUsers] = useState<Map<number, PublicLocation>>(new Map())
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const geoWatchRef = useRef<number | null>(null)
   const chatHistoryLoaded = useRef(false)
 
   // Load chat history on first mount
@@ -150,6 +152,53 @@ export function useLocationSocket({ token, username, userId }: Props) {
     [username]
   )
 
+  // ── Geolocation (independent of WebSocket) ──
+  // Start watchPosition on mount, not inside ws.onopen, to avoid Safari issues
+  // where geolocation calls from non-user-gesture callbacks may be suppressed.
+  useEffect(() => {
+    if (!token || !navigator.geolocation) return
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = pos.coords
+      setSelfLocation({ lat: latitude, lon: longitude, accuracy })
+      sendLocation(latitude, longitude, accuracy)
+      setLocationError(null)
+    }
+
+    const startWatch = (highAccuracy: boolean) => {
+      geoWatchRef.current = navigator.geolocation.watchPosition(
+        onSuccess,
+        (err) => {
+          if (highAccuracy && err.code !== err.PERMISSION_DENIED) {
+            // High-accuracy failed (timeout/unavailable) — retry without it
+            console.warn('Geolocation high-accuracy failed, retrying low-accuracy:', err.message)
+            if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current)
+            startWatch(false)
+          } else {
+            const msg = err.code === err.PERMISSION_DENIED
+              ? 'Location permission denied'
+              : err.code === err.POSITION_UNAVAILABLE
+                ? 'Location unavailable'
+                : 'Location request timed out'
+            console.warn('Geolocation error:', msg, err)
+            setLocationError(msg)
+            Sentry.captureMessage(`Geolocation: ${msg}`, {
+              level: 'warning',
+              extra: { code: err.code, message: err.message, highAccuracy },
+            })
+          }
+        },
+        { enableHighAccuracy: highAccuracy, maximumAge: 5000, timeout: highAccuracy ? 15000 : 10000 },
+      )
+    }
+
+    startWatch(true)
+
+    return () => {
+      if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current)
+    }
+  }, [token, sendLocation])
+
   // Consume task updates (called by MapView after processing)
   const clearTaskUpdates = useCallback(() => setTaskUpdates([]), [])
   const clearUserStats = useCallback(() => setUserStats(null), [])
@@ -170,21 +219,6 @@ export function useLocationSocket({ token, username, userId }: Props) {
           ws.send(JSON.stringify({ type: 'heartbeat' }))
         }
       }, 5000)
-
-      // Track location — use watchPosition for better iOS Safari support
-      if (navigator.geolocation) {
-        const watchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords
-            setSelfLocation({ lat: latitude, lon: longitude, accuracy })
-            sendLocation(latitude, longitude, accuracy)
-          },
-          (err) => console.warn('Geolocation error:', err),
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-        )
-        // Store watchId for cleanup (reuse locationIntervalRef to avoid adding new ref)
-        locationIntervalRef.current = watchId as unknown as ReturnType<typeof setInterval>
-      }
     }
 
     ws.onmessage = (event) => {
@@ -215,7 +249,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 accuracy: data.accuracy ?? 0,
                 friends: data.friends ?? [],
                 skills: data.skills ?? [],
-                profilePicture: data.profile_picture ?? '',
+                profilePicture: data.profilePicture ?? '',
               })
               return next
             })
@@ -239,7 +273,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 lat: data.latitude,
                 lon: data.longitude,
                 accuracy: data.accuracy ?? 0,
-                profilePicture: data.profile_picture ?? '',
+                profilePicture: data.profilePicture ?? '',
               })
               return next
             })
@@ -284,18 +318,18 @@ export function useLocationSocket({ token, username, userId }: Props) {
 
           case 'chat_message': {
             const sender = data.sender ?? 'Unknown'
-            const id = data.msg_id ?? ++msgIdRef.current
+            const id = data.msgId ?? ++msgIdRef.current
             if (sender !== username) {
               setChatMessages((prev) => [
                 ...prev,
                 { id, text: data.message, sender, isSelf: false },
               ])
-            } else if (data.msg_id) {
+            } else if (data.msgId) {
               // Replace the optimistic message with the server-confirmed one
               setChatMessages((prev) => {
                 const last = prev[prev.length - 1]
                 if (last?.isSelf && last.text === data.message && last.id < 0) {
-                  return [...prev.slice(0, -1), { ...last, id: data.msg_id }]
+                  return [...prev.slice(0, -1), { ...last, id: data.msgId }]
                 }
                 return prev
               })
@@ -345,19 +379,17 @@ export function useLocationSocket({ token, username, userId }: Props) {
     }
 
     ws.onclose = () => {
-      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
     }
 
     return () => {
-      if (locationIntervalRef.current) navigator.geolocation?.clearWatch(locationIntervalRef.current as unknown as number)
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
       ws.close()
     }
   }, [token, sendLocation, username, userId])
 
   return {
-    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     // New real-time data
     taskUpdates, clearTaskUpdates,
     userStats, clearUserStats,

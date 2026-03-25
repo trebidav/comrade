@@ -267,16 +267,16 @@ export default function MapView({ user, onLogout }: Props) {
     setTasks((prev) => {
       const updated = [...prev]
       for (const evt of taskUpdates) {
-        const idx = updated.findIndex((t) => t.id === evt.task_id)
+        const idx = updated.findIndex((t) => t.id === evt.taskId)
         if (idx >= 0) {
           updated[idx] = {
             ...updated[idx],
             state: evt.state,
             assignee: evt.assignee,
-            assignee_name: evt.assignee_name,
-            datetime_start: evt.datetime_start,
-            datetime_finish: evt.datetime_finish,
-            datetime_paused: evt.datetime_paused,
+            assignee_name: evt.assigneeName,
+            datetime_start: evt.datetimeStart,
+            datetime_finish: evt.datetimeFinish,
+            datetime_paused: evt.datetimePaused,
           }
         }
       }
@@ -292,7 +292,17 @@ export default function MapView({ user, onLogout }: Props) {
   // ── Live user stats from WebSocket ──
   useEffect(() => {
     if (!userStats) return
-    setCurrentUser((prev) => ({ ...prev, ...userStats }))
+    setCurrentUser((prev) => ({
+      ...prev,
+      coins: userStats.coins,
+      xp: userStats.xp,
+      total_coins_earned: userStats.totalCoinsEarned,
+      total_xp_earned: userStats.totalXpEarned,
+      task_streak: userStats.taskStreak,
+      level: userStats.level,
+      level_progress: userStats.levelProgress,
+      skills: userStats.skills,
+    }))
     clearUserStats()
   }, [userStats, clearUserStats])
 

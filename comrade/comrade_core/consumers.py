@@ -1,10 +1,15 @@
 import json
+import logging
 from datetime import timedelta
+from urllib.parse import parse_qs
+
+logger = logging.getLogger(__name__)
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
+from asgiref.sync import sync_to_async
 from .models import User, ChatMessage
 
 class LocationConsumer(AsyncWebsocketConsumer):
@@ -115,7 +120,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         'type': 'chat_message',
                         'message': message,
                         'sender': sender,
-                        'msg_id': msg_id,
+                        'msgId': msg_id,
                         'timestamp': timestamp,
                     }
                 )
@@ -138,7 +143,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
             # Save location regardless of sharing preferences
             await self.save_user_location(self.user, latitude, longitude)
-            print(f"[{timezone.now()}] Location saved for {self.user.username} at {latitude}, {longitude} profile_picture={self.user.profile_picture!r}")
+            logger.debug("[%s] Location saved for %s at %s, %s profile_picture=%r", timezone.now(), self.user.username, latitude, longitude, self.user.profile_picture)
 
             # Only proceed with sharing if not set to NONE
             if self.user.location_sharing_level != User.SharingLevel.NONE:
@@ -153,7 +158,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                     'timestamp': timezone.now().isoformat(),
                     'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
                     'skills': skills,
-                    'profile_picture': self.user.profile_picture or '',
+                    'profilePicture': self.user.profile_picture or '',
                 }
 
                 # Send detailed update to all friends - assume they're all active
@@ -165,7 +170,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                         friend_update
                     )
                 
-                print(f"[{timezone.now()}] Broadcasting location to {friend_count} friends for {self.user.username}")
+                logger.debug("[%s] Broadcasting location to %d friends for %s", timezone.now(), friend_count, self.user.username)
 
                 # If sharing level is ALL, send basic info to all non-friend users
                 if self.user.location_sharing_level == User.SharingLevel.ALL:
@@ -194,7 +199,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                             public_update
                         )
                     
-                    print(f"[{timezone.now()}] Broadcasting location to {public_count} public users for {self.user.username}")
+                    logger.debug("[%s] Broadcasting location to %d public users for %s", timezone.now(), public_count, self.user.username)
                     
     async def update_preferences(self, preferences_data):
         """Update user's location sharing preferences"""
@@ -224,7 +229,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
             'friends': event['friends'],
             'skills': event['skills'],
-            'profile_picture': event.get('profile_picture', ''),
+            'profilePicture': event.get('profilePicture', ''),
         }))
 
     async def public_location(self, event):
@@ -271,24 +276,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
         user.latitude = latitude
         user.longitude = longitude
         user.timestamp = timezone.now()
-        await database_sync_to_async(user.save)()
-
-    async def group_exists(self, group_name):
-        """Check if a channel group has any members"""
-        try:
-            group_channels = await self.channel_layer.group_channels(group_name)
-            return len(group_channels) > 0
-        except (AttributeError, KeyError):
-            return False
-
-    @database_sync_to_async
-    def get_user_from_token(self):
-        token = self.scope['url_route']['kwargs'].get('token')
-        try:
-            token = Token.objects.get(key=token)
-            return token.user
-        except Token.DoesNotExist:
-            return AnonymousUser()
+        await database_sync_to_async(
+            lambda: user.save(update_fields=['latitude', 'longitude', 'timestamp'])
+        )()
 
     async def chat_message(self, event):
         """Handler for chat messages"""
@@ -296,7 +286,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'type': 'chat_message',
             'message': event['message'],
             'sender': event['sender'],
-            'msg_id': event.get('msg_id'),
+            'msgId': event.get('msgId'),
             'timestamp': event.get('timestamp'),
         }))
 
@@ -326,9 +316,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
     async def friend_online(self, event):
         await self.send(text_data=json.dumps(event))
 
-from urllib.parse import parse_qs
-from asgiref.sync import sync_to_async
-
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         query_string = self.scope['query_string'].decode()
@@ -355,11 +342,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -384,12 +371,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': message
         }))
 
-    @database_sync_to_async
-    def get_user_from_token(self):
-        token = self.scope['url_route']['kwargs'].get('token')
-        print(token)
-        try:
-            token = Token.objects.get(key=token)
-            return token.user
-        except Token.DoesNotExist:
-            return AnonymousUser()
