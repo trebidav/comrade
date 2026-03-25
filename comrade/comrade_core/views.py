@@ -264,7 +264,7 @@ class TaskListView(APIView):
             | models.Q(state=Task.State.IN_REVIEW, skill_write__in=user.skills.all())
             | models.Q(skill_read__isnull=True)
             | models.Q(skill_read__in=user.skills.all())
-        ).distinct()
+        ).distinct().select_related('owner', 'assignee').prefetch_related('skill_execute', 'skill_read', 'skill_write', 'reviews')
         
         # For debugging: count tasks that have location data
         tasks_with_location = tasks.exclude(lat__isnull=True).exclude(lon__isnull=True).count()
@@ -273,7 +273,7 @@ class TaskListView(APIView):
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         # Tutorial tasks: only show if user doesn't already have the reward skill
-        tutorial_tasks = TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
+        tutorial_tasks = TutorialTask.objects.exclude(reward_skill__in=user.skills.all()).prefetch_related('skill_execute')
         tutorial_serializer = TutorialTaskFlatSerializer(tutorial_tasks, many=True, context={'request': request})
 
         return Response(
