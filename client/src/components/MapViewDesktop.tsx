@@ -236,7 +236,7 @@ export default function MapView({ user, onLogout }: Props) {
   }, [])
 
   const {
-    friends, publicUsers, chatMessages, selfLocation, sendChatMessage,
+    friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     taskUpdates, clearTaskUpdates, userStats, clearUserStats,
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
   } = useLocationSocket({
@@ -369,6 +369,23 @@ export default function MapView({ user, onLogout }: Props) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      {locationError === 'Location permission denied' && !selfLocation && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2000,
+          background: 'rgba(180, 50, 50, 0.95)', color: '#fff',
+          padding: '12px 16px', fontSize: '0.85rem', lineHeight: 1.5,
+          backdropFilter: 'blur(8px)', textAlign: 'center',
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Location access is required</div>
+          <div>
+            {/iPhone|iPad|iPod/.test(navigator.userAgent)
+              ? 'Go to Settings → Privacy & Security → Location Services → Safari Websites → set to "While Using"'
+              : /Mac/.test(navigator.userAgent)
+                ? 'Go to System Settings → Privacy & Security → Location Services → enable for your browser'
+                : 'Please allow location access in your browser settings and reload the page.'}
+          </div>
+        </div>
+      )}
       {error && (
         <div
           style={{
