@@ -259,13 +259,11 @@ class TaskListView(APIView):
         # - Always visible: owned tasks, assigned tasks, write-skill IN_REVIEW tasks
         # - Otherwise: visible if task has no read skills OR user has a matching read skill
         tasks = Task.objects.filter(
-            models.Q(owner=user) |
-            models.Q(assignee=user) |
-            models.Q(state=Task.State.IN_REVIEW, skill_write__in=user.skills.all()) |
-            (
-                ~models.Q(skill_read__isnull=False) |
-                models.Q(skill_read__in=user.skills.all())
-            )
+            models.Q(owner=user)
+            | models.Q(assignee=user)
+            | models.Q(state=Task.State.IN_REVIEW, skill_write__in=user.skills.all())
+            | models.Q(skill_read__isnull=True)
+            | models.Q(skill_read__in=user.skills.all())
         ).distinct()
         
         # For debugging: count tasks that have location data
