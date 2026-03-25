@@ -163,7 +163,7 @@ Every model field must appear in the admin (`list_display`, `list_filter`, `fiel
 - **Project:** `comrade` (David Třebický's Projects)
 - **Service:** `comrade` (single service — Django/Daphne ASGI + React SPA bundled)
 - **Environment:** `production`
-- **Live URL:** https://comrade-production.up.railway.app
+- **Live URL:** https://demo.comrade.live (also: https://comrade-production.up.railway.app)
 - **Builder:** Railpack (`railway.toml` + `railpack.json`)
 - **Runtime:** Python 3.12 + Node 22
 
