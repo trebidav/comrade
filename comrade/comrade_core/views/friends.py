@@ -22,7 +22,7 @@ def send_friend_request(request, user_id):
             'type': 'friend_request_received',
             'from_user': {'id': request.user.id, 'username': request.user.username},
         })
-        return Response({'status': 'Friend request sent'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Friend request sent'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except ValidationError as e:
@@ -77,7 +77,7 @@ def accept_friend_request(request, user_id):
 
         new_achievements = request.user.check_and_award_achievements()
         send_achievements(request.user.id, new_achievements)
-        return Response({'status': 'Friend request accepted', 'new_achievements': _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
+        return Response({'message': 'Friend request accepted', 'new_achievements': _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except ValidationError as e:
@@ -93,7 +93,7 @@ def reject_friend_request(request, user_id):
             'type': 'friend_request_rejected',
             'user_id': request.user.id,
         })
-        return Response({'status': 'Friend request rejected'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Friend request rejected'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except ValidationError as e:
@@ -109,7 +109,7 @@ def remove_friend(request, user_id):
             'type': 'friend_removed',
             'user_id': request.user.id,
         })
-        return Response({'status': 'Friend removed'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Friend removed'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except ValidationError as e:

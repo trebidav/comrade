@@ -45,4 +45,4 @@ def welcome_accept(request):
     """Mark the welcome message as accepted for this user."""
     request.user.welcome_accepted = True
     request.user.save(update_fields=['welcome_accepted'])
-    return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+    return Response({'message': 'ok'}, status=status.HTTP_200_OK)
