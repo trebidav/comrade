@@ -1,5 +1,6 @@
 import datetime
 import math
+import time as _time
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
@@ -7,6 +8,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.timezone import now
+
+
+_config_cache = {'obj': None, 'ts': 0}
+_CONFIG_TTL = 60  # seconds
 
 
 class LocationConfig(models.Model):
@@ -66,8 +71,13 @@ class LocationConfig(models.Model):
 
     @classmethod
     def get_config(cls):
-        """Get or create the global configuration"""
+        """Get or create the global configuration (cached for 60s)."""
+        now_ts = _time.monotonic()
+        if _config_cache['obj'] is not None and (now_ts - _config_cache['ts']) < _CONFIG_TTL:
+            return _config_cache['obj']
         config, created = cls.objects.get_or_create(pk=1)
+        _config_cache['obj'] = config
+        _config_cache['ts'] = now_ts
         return config
 
     def __str__(self):
