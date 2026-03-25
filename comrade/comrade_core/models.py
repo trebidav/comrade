@@ -283,18 +283,6 @@ class User(AbstractUser):
 
         return distance
 
-    def get_nearby_users(self):
-        """Get users within the configured distance"""
-        config = LocationConfig.get_config()
-        nearby_users = []
-        
-        for user in User.objects.exclude(id=self.id):
-            if user.location_sharing_level == User.SharingLevel.ALL:
-                distance = self.distance_to(user)
-                if distance <= config.max_distance_km:
-                    nearby_users.append(user)
-        
-        return nearby_users
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -475,25 +463,6 @@ class Task(models.Model):
         self._accumulate_time()
         self.datetime_finish = now()
         self.state = Task.State.IN_REVIEW
-        self.save()
-
-    def review(self, user: User):
-        if self.state != Task.State.IN_REVIEW:
-            return False
-
-        if user == self.owner:
-            raise ValidationError("Owner cannot review the task")
-
-        has_required_skills = user.skills.filter(
-            id__in=self.skill_write.all()
-        ).exists()
-        if not has_required_skills:
-            raise ValidationError("User does not have required skills")
-
-        r = Review(done=1)
-        r.task = self
-        r.save()
-        self.state = Task.State.DONE
         self.save()
 
     def _can_review(self, user: 'User') -> bool:
