@@ -23,7 +23,8 @@ from .serializers import UserDetailSerializer, TaskSerializer, SkillSerializer, 
 from django.core.exceptions import ValidationError
 from .ws_events import send_task_update, send_user_stats, send_achievements, send_friend_event
 from django.utils.timezone import now
-from .models import User, Rating, Review, Skill, LocationConfig, haversine_km, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress, Achievement, UserAchievement
+from .models import User, Rating, Review, Skill, LocationConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress, Achievement, UserAchievement
+from .utils import haversine_km
 
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator

@@ -3,6 +3,8 @@ import math
 import time as _time
 from datetime import timedelta
 
+from .utils import haversine_km, compute_level
+
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -141,31 +143,17 @@ class User(AbstractUser):
 
     @property
     def level(self) -> int:
-        """Compute current level from total_xp_earned. Base 1000 XP per level, +10% per level, scaled by level_modifier."""
+        """Compute current level from total_xp_earned."""
         config = LocationConfig.get_config()
-        modifier = config.level_modifier if config.level_modifier > 0 else 1.0
-        xp = self.total_xp_earned
-        lvl = 0
-        required = 1000.0 * modifier
-        while xp >= required:
-            xp -= required
-            lvl += 1
-            required = 1000.0 * modifier * (1.1 ** lvl)
+        lvl, _, _ = compute_level(self.total_xp_earned, config.level_modifier)
         return lvl
 
     @property
     def level_progress(self) -> dict:
         """Return current level, XP into current level, and XP required for next level."""
         config = LocationConfig.get_config()
-        modifier = config.level_modifier if config.level_modifier > 0 else 1.0
-        xp = self.total_xp_earned
-        lvl = 0
-        required = 1000.0 * modifier
-        while xp >= required:
-            xp -= required
-            lvl += 1
-            required = 1000.0 * modifier * (1.1 ** lvl)
-        return {'level': lvl, 'current_xp': xp, 'required_xp': required}
+        lvl, current_xp, required_xp = compute_level(self.total_xp_earned, config.level_modifier)
+        return {'level': lvl, 'current_xp': current_xp, 'required_xp': required_xp}
 
     def has_skill(self, skill_name):
         return self.skills.filter(name=skill_name).exists()
@@ -277,30 +265,9 @@ class User(AbstractUser):
         return new_awards
 
     def distance_to(self, other_user):
-        """Calculate distance to another user in kilometers using Haversine formula"""
-        from math import radians, sin, cos, sqrt, atan2
+        """Calculate distance to another user in kilometers."""
+        return haversine_km(self.latitude, self.longitude, other_user.latitude, other_user.longitude)
 
-        # Convert latitude and longitude to radians
-        lat1, lon1 = radians(self.latitude), radians(self.longitude)
-        lat2, lon2 = radians(other_user.latitude), radians(other_user.longitude)
-
-        # Haversine formula
-        dlon = lon2 - lon1
-        dlat = lat2 - lat1
-        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
-        distance = 6371 * c  # Earth's radius in km * c
-
-        return distance
-
-
-
-def haversine_km(lat1, lon1, lat2, lon2):
-    R = 6371
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 class Skill(models.Model):
