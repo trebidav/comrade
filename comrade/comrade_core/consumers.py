@@ -1,10 +1,12 @@
 import json
 from datetime import timedelta
+from urllib.parse import parse_qs
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
+from asgiref.sync import sync_to_async
 from .models import User, ChatMessage
 
 class LocationConsumer(AsyncWebsocketConsumer):
@@ -273,23 +275,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
         user.timestamp = timezone.now()
         await database_sync_to_async(user.save)()
 
-    async def group_exists(self, group_name):
-        """Check if a channel group has any members"""
-        try:
-            group_channels = await self.channel_layer.group_channels(group_name)
-            return len(group_channels) > 0
-        except (AttributeError, KeyError):
-            return False
-
-    @database_sync_to_async
-    def get_user_from_token(self):
-        token = self.scope['url_route']['kwargs'].get('token')
-        try:
-            token = Token.objects.get(key=token)
-            return token.user
-        except Token.DoesNotExist:
-            return AnonymousUser()
-
     async def chat_message(self, event):
         """Handler for chat messages"""
         await self.send(text_data=json.dumps({
@@ -326,9 +311,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
     async def friend_online(self, event):
         await self.send(text_data=json.dumps(event))
 
-from urllib.parse import parse_qs
-from asgiref.sync import sync_to_async
-
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         query_string = self.scope['query_string'].decode()
@@ -355,11 +337,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -384,12 +366,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': message
         }))
 
-    @database_sync_to_async
-    def get_user_from_token(self):
-        token = self.scope['url_route']['kwargs'].get('token')
-        print(token)
-        try:
-            token = Token.objects.get(key=token)
-            return token.user
-        except Token.DoesNotExist:
-            return AnonymousUser()
