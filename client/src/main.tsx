@@ -5,7 +5,7 @@ import './index.css'
 import App from './App.tsx'
 
 Sentry.init({
-  dsn: 'https://jGUipzDiu5LxADJpRL19iW2M@s2320878.eu-fsn-3.betterstackdata.com/2320878',
+  dsn: 'https://KcNpji8QA8baHfo7AihgWcWB@s2321538.eu-fsn-3.betterstackdata.com/2321538',
   environment: import.meta.env.PROD ? 'production' : 'development',
   enabled: import.meta.env.PROD,
 })
