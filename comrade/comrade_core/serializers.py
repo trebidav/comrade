@@ -44,9 +44,11 @@ class TaskSerializer(serializers.ModelSerializer):
         return False
 
     def get_pending_review(self, obj):
-        review = obj.reviews.filter(status='pending').order_by('-created_at').first()
-        if review:
-            return PendingReviewSerializer(review, context=self.context).data
+        # Filter in Python over prefetched reviews to avoid extra queries
+        pending = [r for r in obj.reviews.all() if r.status == 'pending']
+        if pending:
+            pending.sort(key=lambda r: r.created_at, reverse=True)
+            return PendingReviewSerializer(pending[0], context=self.context).data
         return None
 
     class Meta:
@@ -136,6 +138,10 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
         return [s.name for s in obj.skill_execute.all()]
 
     def get_in_progress(self, obj):
+        in_progress_ids = self.context.get('in_progress_ids')
+        if in_progress_ids is not None:
+            return obj.pk in in_progress_ids
+        # Fallback for non-list contexts (e.g. detail views)
         request = self.context.get('request')
         if not request:
             return False

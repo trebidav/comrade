@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Task, Rating, Review, Skill, LocationConfig, TutorialTask
+from ..models import Task, Rating, Review, Skill, LocationConfig, TutorialTask, TutorialProgress
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer
 from ..utils import haversine_km
 from ..ws_events import send_task_update, send_user_stats, send_achievements
@@ -173,15 +173,26 @@ class TaskListView(APIView):
             | models.Q(skill_read__in=user.skills.all())
         ).distinct().select_related('owner', 'assignee').prefetch_related('skill_execute', 'skill_read', 'skill_write', 'reviews')
 
-        # For debugging: count tasks that have location data
-        tasks_with_location = tasks.exclude(lat__isnull=True).exclude(lon__isnull=True).count()
-        logger.debug("Found %d tasks for user %s (%d with location)", tasks.count(), user, tasks_with_location)
-
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         # Tutorial tasks: only show if user doesn't already have the reward skill
-        tutorial_tasks = TutorialTask.objects.exclude(reward_skill__in=user.skills.all()).prefetch_related('skill_execute')
-        tutorial_serializer = TutorialTaskFlatSerializer(tutorial_tasks, many=True, context={'request': request})
+        # Prefetch skill_execute + reward_skill; batch-fetch in_progress status
+        tutorial_tasks = list(
+            TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
+            .select_related('reward_skill')
+            .prefetch_related('skill_execute')
+        )
+        # Batch lookup: which tutorials does this user have in progress?
+        in_progress_ids = set(
+            TutorialProgress.objects.filter(
+                user=user, state=TutorialProgress.State.IN_PROGRESS,
+                tutorial__in=tutorial_tasks,
+            ).values_list('tutorial_id', flat=True)
+        ) if tutorial_tasks else set()
+        tutorial_serializer = TutorialTaskFlatSerializer(
+            tutorial_tasks, many=True,
+            context={'request': request, 'in_progress_ids': in_progress_ids},
+        )
 
         return Response(
             {"tasks": list(task_serializer.data) + list(tutorial_serializer.data)},
