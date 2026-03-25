@@ -276,7 +276,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
         user.latitude = latitude
         user.longitude = longitude
         user.timestamp = timezone.now()
-        await database_sync_to_async(user.save)()
+        await database_sync_to_async(
+            lambda: user.save(update_fields=['latitude', 'longitude', 'timestamp'])
+        )()
 
     async def chat_message(self, event):
         """Handler for chat messages"""
