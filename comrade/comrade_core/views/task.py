@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 class TaskStartView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -51,10 +51,10 @@ class TaskStartView(APIView):
 class TaskFinishView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -83,9 +83,9 @@ class TaskFinishView(APIView):
 class TaskRateView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         try:
-            task = Task.objects.get(pk=taskId)
+            task = Task.objects.get(pk=task_id)
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -107,10 +107,10 @@ class TaskRateView(APIView):
 class TaskPauseView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -128,10 +128,10 @@ class TaskPauseView(APIView):
 class TaskResumeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -191,10 +191,10 @@ class TaskListView(APIView):
 class TaskAbandonView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
             try:
@@ -208,10 +208,10 @@ class TaskAbandonView(APIView):
 class TaskAcceptReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
             try:
@@ -239,10 +239,10 @@ class TaskAcceptReviewView(APIView):
 class TaskDeclineReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         with transaction.atomic():
             try:
-                task = Task.objects.select_for_update().get(pk=taskId)
+                task = Task.objects.select_for_update().get(pk=task_id)
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
             try:
@@ -256,9 +256,9 @@ class TaskDeclineReviewView(APIView):
 class TaskDebugResetView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request: Request, taskId: int):
+    def post(self, request: Request, task_id: int):
         try:
-            task = Task.objects.get(pk=taskId)
+            task = Task.objects.get(pk=task_id)
         except Task.DoesNotExist:
             return Response(
                 {"error": "Task not found"},

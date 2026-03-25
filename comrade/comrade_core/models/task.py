@@ -136,7 +136,7 @@ class Task(models.Model):
             raise ValidationError("Only assignee can pause the task")
 
         if self.state != Task.State.IN_PROGRESS:
-            return False
+            raise ValidationError("Task is not in progress")
 
         self._accumulate_time()
         self.state = Task.State.WAITING
@@ -145,7 +145,7 @@ class Task(models.Model):
 
     def resume(self, user):
         if self.state != Task.State.WAITING:
-            return False
+            raise ValidationError("Task is not waiting")
 
         if user != self.assignee:
             raise ValidationError("Only assignee can resume the task")
@@ -164,7 +164,7 @@ class Task(models.Model):
 
     def finish(self, user):
         if self.state != Task.State.IN_PROGRESS:
-            return False
+            raise ValidationError("Task is not in progress")
 
         if user != self.owner and user != self.assignee:
             raise ValidationError("Only owner and assignee can finish the task")

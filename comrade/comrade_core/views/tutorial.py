@@ -14,9 +14,9 @@ from .task import _serialize_achievements
 class TutorialDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, taskId):
+    def get(self, request, task_id):
         try:
-            tutorial = TutorialTask.objects.get(pk=taskId)
+            tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial not found"}, status=status.HTTP_404_NOT_FOUND)
         serializer = TutorialTaskDetailSerializer(tutorial, context={'request': request})
@@ -26,10 +26,10 @@ class TutorialDetailView(APIView):
 class TutorialSubmitPartView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, taskId, partId):
+    def post(self, request, task_id, part_id):
         try:
-            tutorial = TutorialTask.objects.get(pk=taskId)
-            part = tutorial.parts.get(pk=partId)
+            tutorial = TutorialTask.objects.get(pk=task_id)
+            part = tutorial.parts.get(pk=part_id)
         except (TutorialTask.DoesNotExist, TutorialPart.DoesNotExist):
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -81,9 +81,9 @@ class TutorialSubmitPartView(APIView):
 class TutorialTaskStartView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, taskId):
+    def post(self, request, task_id):
         try:
-            tutorial = TutorialTask.objects.get(pk=taskId)
+            tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -117,9 +117,9 @@ class TutorialTaskStartView(APIView):
 class TutorialTaskAbandonView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, taskId):
+    def post(self, request, task_id):
         try:
-            tutorial = TutorialTask.objects.get(pk=taskId)
+            tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
