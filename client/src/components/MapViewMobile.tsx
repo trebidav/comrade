@@ -390,6 +390,12 @@ export default function MapView({ user, onLogout }: Props) {
     if (task.lat != null && task.lon != null) {
       window.dispatchEvent(new CustomEvent('pip-pan-to', { detail: { lat: task.lat, lon: task.lon } }))
     }
+    // In-progress tutorials: show the tutorial panel instead of opening detail sheet
+    if (task.is_tutorial && task.in_progress) {
+      setSelectedTask(null)
+      setActiveSheet(null)
+      return
+    }
     setSelectedTask(task)
     setActiveSheet(null)
   }
@@ -552,10 +558,7 @@ export default function MapView({ user, onLogout }: Props) {
                   position={[task.lat!, task.lon!]}
                   icon={icon}
                   eventHandlers={{
-                    click: () => {
-                      setSelectedTask(task)
-                      setActiveSheet(null)
-                    },
+                    click: () => handleTaskClick(task),
                   }}
                 />
               )
@@ -994,6 +997,7 @@ function TaskDetailContent({
             Start Tutorial
           </button>
         )}
+
 
         {!task.is_tutorial && task.state === 1 && !isAssignee && canStart && inProximity && (
           <button
