@@ -641,27 +641,13 @@ export default function MapView({ user, onLogout }: Props) {
           <Chat messages={chatMessages} onSend={sendChatMessage} />
 
           {/* Bottom-right: Bug report + Center on Me */}
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch', width: 'auto' }}>
             <button
               onClick={() => setShowBugReport(true)}
-              title="Report a bug"
-              style={{
-                width: '40px', height: '40px', borderRadius: '50%',
-                background: 'var(--glass-bg, rgba(10,15,13,0.85))',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '2px solid var(--glass-border, rgba(52,168,83,0.2))',
-                color: 'var(--pip-green, #34A853)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '1.1rem',
-                boxShadow: 'var(--glass-shadow, 0 2px 8px rgba(0,0,0,0.3))',
-                transition: 'transform 0.12s',
-              }}
-              onPointerDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-              onPointerUp={(e) => (e.currentTarget.style.transform = '')}
-              onPointerLeave={(e) => (e.currentTarget.style.transform = '')}
+              className="pip-btn pip-btn-primary"
+              style={{ padding: '8px 14px', fontSize: '0.75rem', width: '100%' }}
             >
-              &#128027;
+              &#128027; Report Bug
             </button>
             <CenterOnMeInOverlay selfLat={selfLocation?.lat ?? null} selfLon={selfLocation?.lon ?? null} />
           </div>
