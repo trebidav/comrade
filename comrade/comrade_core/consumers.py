@@ -40,6 +40,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_add(PUBLIC_LOCATIONS_GROUP, self.channel_name)
 
             await self.accept()
+            logger.info("WS connect: user %d (%s)", self.user.id, self.user.username)
 
             # Cache friends list and profile refresh timestamp
             self._friends_cache = await database_sync_to_async(lambda: list(self.user.get_friends()))()
@@ -56,11 +57,13 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 await self.channel_layer.group_send(f"location_{friend.id}", online_msg)
 
         except Token.DoesNotExist:
+            logger.warning("WS connect: invalid token")
             await self.close()
 
     async def disconnect(self, close_code):
         if not hasattr(self, 'location_group'):
             return
+        logger.info("WS disconnect: user %d (%s)", self.user.id, self.user.username)
 
         offline_message = {
             'type': 'user_offline',

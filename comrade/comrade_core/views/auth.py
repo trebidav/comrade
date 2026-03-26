@@ -1,8 +1,11 @@
 import json
+import logging
 import urllib.parse
 import urllib.request
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
@@ -90,6 +93,7 @@ def google_oauth_callback(request):
     code = request.GET.get('code')
 
     if error or not code:
+        logger.warning("OAuth callback: access denied (error=%s)", error)
         return redirect('/?google_error=access_denied')
 
     # Exchange the authorization code for tokens
@@ -111,6 +115,7 @@ def google_oauth_callback(request):
         with urllib.request.urlopen(req) as resp:
             token_data = json.loads(resp.read())
     except Exception:
+        logger.warning("OAuth callback: token exchange failed")
         return redirect('/?google_error=token_exchange_failed')
 
     raw_id_token = token_data.get('id_token')
@@ -127,10 +132,12 @@ def google_oauth_callback(request):
             settings.GOOGLE_CLIENT_ID,
         )
     except Exception:
+        logger.warning("OAuth callback: invalid id_token")
         return redirect('/?google_error=invalid_token')
 
     email = id_info.get('email')
     if not email:
+        logger.warning("OAuth callback: no email in id_token")
         return redirect('/?google_error=no_email')
 
     # Get or create the Django user
@@ -157,6 +164,7 @@ def google_oauth_callback(request):
         user.save(update_fields=update_fields)
 
     drf_token, _ = Token.objects.get_or_create(user=user)
+    logger.info("OAuth login: %s (id=%d, new=%s)", email, user.id, created)
     return redirect(f'/?google_token={drf_token.key}')
 
 

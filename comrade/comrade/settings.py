@@ -183,7 +183,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            'format': '{levelname} {asctime} {name} {message}',
             'style': '{',
         },
     },
@@ -194,10 +194,10 @@ LOGGING = {
         },
     },
     'loggers': {
-        'comrade_core.consumers': {
+        'comrade_core': {
             'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
         },
     },
 }

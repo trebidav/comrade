@@ -1,3 +1,5 @@
+import logging
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.exceptions import ValidationError
@@ -7,6 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import User
+
+logger = logging.getLogger(__name__)
 from ..serializers import UserDetailSerializer
 from ..ws_events import send_friend_event, send_achievements
 from .task import _serialize_achievements
@@ -18,6 +22,7 @@ def send_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.send_friend_request(target_user)
+        logger.info("Friend request: user %d → user %d", request.user.id, target_user.id)
         send_friend_event(target_user.id, {
             'type': 'friend_request_received',
             'fromUser': {'id': request.user.id, 'username': request.user.username},
@@ -34,6 +39,7 @@ def accept_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.accept_friend_request(target_user)
+        logger.info("Friend accepted: user %d ↔ user %d", request.user.id, target_user.id)
 
         # Get channel layer for WebSocket communication
         channel_layer = get_channel_layer()
@@ -89,6 +95,7 @@ def reject_friend_request(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.reject_friend_request(target_user)
+        logger.info("Friend rejected: user %d rejected user %d", request.user.id, target_user.id)
         send_friend_event(target_user.id, {
             'type': 'friend_request_rejected',
             'userId': request.user.id,
@@ -105,6 +112,7 @@ def remove_friend(request, user_id):
     try:
         target_user = User.objects.get(id=user_id)
         request.user.remove_friend(target_user)
+        logger.info("Friend removed: user %d removed user %d", request.user.id, target_user.id)
         send_friend_event(target_user.id, {
             'type': 'friend_removed',
             'userId': request.user.id,

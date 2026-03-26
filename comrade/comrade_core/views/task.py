@@ -42,6 +42,7 @@ class TaskStartView(APIView):
             except ValidationError as e:
                 return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
 
+        logger.info("Task %d started by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='start', exclude_user_id=request.user.id)
         return Response(
             {"message": "Task started!"},
@@ -76,6 +77,7 @@ class TaskFinishView(APIView):
                 review.photo = photo
             review.save()
 
+        logger.info("Task %d finished by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='finish', exclude_user_id=request.user.id)
         return Response({"message": "Task finished!"}, status=status.HTTP_200_OK)
 
@@ -212,6 +214,7 @@ class TaskAbandonView(APIView):
                 task.abandon(request.user)
             except ValidationError as e:
                 return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        logger.info("Task %d abandoned by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='abandon', exclude_user_id=request.user.id)
         return Response({"message": "Task abandoned."}, status=status.HTTP_200_OK)
 
@@ -232,6 +235,7 @@ class TaskAcceptReviewView(APIView):
             earned_coins = task.coins if task.coins is not None else 0
             earned_xp = task.xp if task.xp is not None else 0
 
+        logger.info("Task %d review accepted by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
         # Push stats and achievements to the ASSIGNEE (not the owner who called this)
         if task.assignee:
@@ -260,6 +264,7 @@ class TaskDeclineReviewView(APIView):
                 task.decline_review(request.user)
             except ValidationError as e:
                 return Response({"error": str(e)}, status=status.HTTP_412_PRECONDITION_FAILED)
+        logger.info("Task %d review declined by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='decline_review', exclude_user_id=request.user.id)
         return Response({"message": "Review declined, task reset to open."}, status=status.HTTP_200_OK)
 
