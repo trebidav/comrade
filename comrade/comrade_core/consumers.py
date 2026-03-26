@@ -1,224 +1,220 @@
 import json
 import logging
-from datetime import timedelta
+import time as _time
 from urllib.parse import parse_qs
 
-logger = logging.getLogger(__name__)
-from django.utils import timezone
-from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
-from django.contrib.auth.models import AnonymousUser
-from rest_framework.authtoken.models import Token
 from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.utils import timezone
+from rest_framework.authtoken.models import Token
+
 from .models import User, ChatMessage
+
+logger = logging.getLogger(__name__)
+
+# Shared group for public location broadcasts (all connected users join this)
+PUBLIC_LOCATIONS_GROUP = 'public_locations'
+
+# How often to refresh user profile from DB (seconds)
+_PROFILE_REFRESH_INTERVAL = 60
+
 
 class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         query_string = self.scope['query_string'].decode()
         query_params = parse_qs(query_string)
-        self.token = query_params.get('token', [None])[0]
+        token_key = query_params.get('token', [None])[0]
         try:
-            token = await database_sync_to_async(Token.objects.get)(key=self.token)
+            token = await database_sync_to_async(Token.objects.get)(key=token_key)
             self.user = await sync_to_async(lambda: token.user)()
-            if self.user.is_authenticated:
-                # Create a unique group for this user's location updates
-                self.location_group = f"location_{self.user.id}"
-                await self.channel_layer.group_add(
-                    self.location_group,
-                    self.channel_name
-                )
-                await self.accept()
-
-                # Notify friends that this user came online
-                friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
-                online_msg = {
-                    'type': 'friend_online',
-                    'userId': self.user.id,
-                    'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
-                }
-                for friend in friends:
-                    await self.channel_layer.group_send(f"location_{friend.id}", online_msg)
-            else:
+            if not self.user.is_authenticated:
                 await self.close()
+                return
+
+            # Per-user group for targeted messages (task updates, stats, achievements, etc.)
+            self.location_group = f"location_{self.user.id}"
+            await self.channel_layer.group_add(self.location_group, self.channel_name)
+
+            # Shared group for public location broadcasts
+            await self.channel_layer.group_add(PUBLIC_LOCATIONS_GROUP, self.channel_name)
+
+            await self.accept()
+
+            # Cache friends list and profile refresh timestamp
+            self._friends_cache = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+            self._friends_ids = {f.id for f in self._friends_cache}
+            self._profile_refreshed_at = _time.monotonic()
+
+            # Notify friends that this user came online
+            online_msg = {
+                'type': 'friend_online',
+                'userId': self.user.id,
+                'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+            }
+            for friend in self._friends_cache:
+                await self.channel_layer.group_send(f"location_{friend.id}", online_msg)
+
         except Token.DoesNotExist:
             await self.close()
 
     async def disconnect(self, close_code):
-        if hasattr(self, 'location_group'):
-            # Get user's friends and sharing level before sending offline notification
+        if not hasattr(self, 'location_group'):
+            return
+
+        offline_message = {
+            'type': 'user_offline',
+            'userId': self.user.id,
+        }
+
+        # Notify friends
+        friends = getattr(self, '_friends_cache', None)
+        if friends is None:
             friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
-            
-            # Prepare offline notification
-            offline_message = {
-                'type': 'user_offline',
-                'userId': self.user.id
-            }
+        for friend in friends:
+            await self.channel_layer.group_send(f"location_{friend.id}", offline_message)
 
-            # Send offline notification to all friends
-            for friend in friends:
-                friend_location_group = f"location_{friend.id}"
-                await self.channel_layer.group_send(
-                    friend_location_group,
-                    offline_message
-                )
+        # Notify public users via shared group (single call instead of O(N))
+        if self.user.location_sharing_level == User.SharingLevel.ALL:
+            await self.channel_layer.group_send(PUBLIC_LOCATIONS_GROUP, offline_message)
 
-            # If sharing was set to ALL, also notify all non-friends
-            if self.user.location_sharing_level == User.SharingLevel.ALL:
-                all_users = await database_sync_to_async(
-                    lambda: list(User.objects.exclude(id=self.user.id).exclude(id__in=[f.id for f in friends]))
-                )()
-                
-                for user in all_users:
-                    user_location_group = f"location_{user.id}"
-                    await self.channel_layer.group_send(
-                        user_location_group,
-                        offline_message
-                    )
-
-            # Finally, leave the group
-            await self.channel_layer.group_discard(
-                self.location_group,
-                self.channel_name
-            )
+        # Leave groups
+        await self.channel_layer.group_discard(PUBLIC_LOCATIONS_GROUP, self.channel_name)
+        await self.channel_layer.group_discard(self.location_group, self.channel_name)
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            return
+
+        msg_type = data.get('type')
+
         # Handle preference updates
         if 'preferences' in data:
-            await self.update_preferences(data['preferences'])
-            return
-            
-        # Handle heartbeat
-        if data.get('type') == 'heartbeat':
-            await self.send(text_data=json.dumps({
-                'type': 'heartbeat_response'
-            }))
+            await self._handle_preferences(data['preferences'])
             return
 
-        # Handle chat messages
-        if data.get('type') == 'chat_message':
-            message = data.get('message')
-            sender = data.get('sender')
-
-            # Persist to database
-            msg = await database_sync_to_async(ChatMessage.objects.create)(
-                sender=self.user, text=message
-            )
-            msg_id = msg.id
-            timestamp = msg.created_at.isoformat()
-
-            # Get user's friends
-            friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
-
-            # Send message to all friends
-            for friend in friends:
-                friend_location_group = f"location_{friend.id}"
-                await self.channel_layer.group_send(
-                    friend_location_group,
-                    {
-                        'type': 'chat_message',
-                        'message': message,
-                        'sender': sender,
-                        'msgId': msg_id,
-                        'timestamp': timestamp,
-                    }
-                )
+        if msg_type == 'heartbeat':
+            await self.send(text_data=json.dumps({'type': 'heartbeat_response'}))
             return
 
-        # Handle location updates
-        if data.get('type') == 'location_update':
-            latitude = data['latitude']
-            longitude = data['longitude']
-            accuracy = data.get('accuracy', 50)  # Default accuracy if not provided
+        if msg_type == 'chat_message':
+            await self._handle_chat(data)
+            return
 
-            # Refresh user from DB to pick up profile_picture and other changes
+        if msg_type == 'location_update':
+            await self._handle_location(data)
+            return
+
+    # ── Message handlers ──
+
+    async def _handle_chat(self, data):
+        message = (data.get('message') or '').strip()
+        if not message:
+            return
+
+        # Always use server-side username, never trust client
+        sender = self.user.username
+
+        msg = await database_sync_to_async(ChatMessage.objects.create)(
+            sender=self.user, text=message,
+        )
+
+        chat_event = {
+            'type': 'chat_message',
+            'message': message,
+            'sender': sender,
+            'msgId': msg.id,
+            'timestamp': msg.created_at.isoformat(),
+        }
+
+        for friend in self._friends_cache:
+            await self.channel_layer.group_send(f"location_{friend.id}", chat_event)
+
+    async def _handle_location(self, data):
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        if latitude is None or longitude is None:
+            return
+        accuracy = data.get('accuracy', 50)
+
+        # Refresh profile periodically (not every ping)
+        if _time.monotonic() - self._profile_refreshed_at > _PROFILE_REFRESH_INTERVAL:
             await database_sync_to_async(self.user.refresh_from_db)()
+            self._profile_refreshed_at = _time.monotonic()
 
-            # Get user's friends and skills for updates
-            friends = await database_sync_to_async(lambda: list(self.user.get_friends()))()
-            skills = await database_sync_to_async(
-                lambda: list(self.user.skills.values_list('name', flat=True))
-            )()
+        # Save location
+        await self._save_location(latitude, longitude)
 
-            # Save location regardless of sharing preferences
-            await self.save_user_location(self.user, latitude, longitude)
-            logger.debug("[%s] Location saved for %s at %s, %s profile_picture=%r", timezone.now(), self.user.username, latitude, longitude, self.user.profile_picture)
+        # Only share if not set to NONE
+        if self.user.location_sharing_level == User.SharingLevel.NONE:
+            return
 
-            # Only proceed with sharing if not set to NONE
-            if self.user.location_sharing_level != User.SharingLevel.NONE:
-                # First, always send detailed updates to friends
-                friend_update = {
-                    'type': 'friend_location',
-                    'userId': self.user.id,
-                    'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
-                    'latitude': latitude,
-                    'longitude': longitude,
-                    'accuracy': accuracy,
-                    'timestamp': timezone.now().isoformat(),
-                    'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in friends],
-                    'skills': skills,
-                    'profilePicture': self.user.profile_picture or '',
-                }
+        skills = await database_sync_to_async(
+            lambda: list(self.user.skills.values_list('name', flat=True))
+        )()
 
-                # Send detailed update to all friends - assume they're all active
-                friend_count = len(friends)
-                for friend in friends:
-                    friend_location_group = f"location_{friend.id}"
-                    await self.channel_layer.group_send(
-                        friend_location_group,
-                        friend_update
-                    )
-                
-                logger.debug("[%s] Broadcasting location to %d friends for %s", timezone.now(), friend_count, self.user.username)
+        # Send detailed update to friends (small set, per-user groups)
+        friend_update = {
+            'type': 'friend_location',
+            'userId': self.user.id,
+            'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+            'latitude': latitude,
+            'longitude': longitude,
+            'accuracy': accuracy,
+            'timestamp': timezone.now().isoformat(),
+            'friends': [{'id': f.id, 'name': f"{f.first_name} {f.last_name}".strip() or f.username} for f in self._friends_cache],
+            'skills': skills,
+            'profilePicture': self.user.profile_picture or '',
+        }
+        for friend in self._friends_cache:
+            await self.channel_layer.group_send(f"location_{friend.id}", friend_update)
 
-                # If sharing level is ALL, send basic info to all non-friend users
-                if self.user.location_sharing_level == User.SharingLevel.ALL:
-                    # For public users, send location without detailed info
-                    public_update = {
-                        'type': 'public_location',
-                        'userId': self.user.id,
-                        'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
-                        'latitude': latitude,
-                        'longitude': longitude,
-                        'accuracy': accuracy,
-                        'timestamp': timezone.now().isoformat(),
-                    }
+        # Public broadcast via shared group (single call instead of O(N))
+        if self.user.location_sharing_level == User.SharingLevel.ALL:
+            public_update = {
+                'type': 'public_location',
+                'userId': self.user.id,
+                'name': f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username,
+                'latitude': latitude,
+                'longitude': longitude,
+                'accuracy': accuracy,
+                'timestamp': timezone.now().isoformat(),
+            }
+            await self.channel_layer.group_send(PUBLIC_LOCATIONS_GROUP, public_update)
 
-                    # Get ALL users except self and friends
-                    all_users = await database_sync_to_async(
-                        lambda: list(User.objects.exclude(id=self.user.id).exclude(id__in=[f.id for f in friends]))
-                    )()
-                    
-                    # Send to all non-friend users - assume they're all active
-                    public_count = len(all_users)
-                    for user in all_users:
-                        user_location_group = f"location_{user.id}"
-                        await self.channel_layer.group_send(
-                            user_location_group,
-                            public_update
-                        )
-                    
-                    logger.debug("[%s] Broadcasting location to %d public users for %s", timezone.now(), public_count, self.user.username)
-                    
-    async def update_preferences(self, preferences_data):
-        """Update user's location sharing preferences"""
+    async def _handle_preferences(self, preferences_data):
         sharing_level = preferences_data.get('sharing_level')
         if sharing_level in dict(User.SharingLevel.choices):
             self.user.location_sharing_level = sharing_level
-            await database_sync_to_async(self.user.save)()
-        
-        # Send confirmation back to user
+            await database_sync_to_async(
+                lambda: self.user.save(update_fields=['location_sharing_level'])
+            )()
+
         await self.send(text_data=json.dumps({
             'type': 'preferences_updated',
             'status': 'success',
-            'preferences': {
-                'sharing_level': self.user.location_sharing_level
-            }
+            'preferences': {'sharing_level': self.user.location_sharing_level},
         }))
 
+    async def _save_location(self, latitude, longitude):
+        self.user.latitude = latitude
+        self.user.longitude = longitude
+        self.user.timestamp = timezone.now()
+        await database_sync_to_async(
+            lambda: self.user.save(update_fields=['latitude', 'longitude', 'timestamp'])
+        )()
+
+    # ── Invalidate friends cache on friend events ──
+
+    async def _refresh_friends_cache(self):
+        self._friends_cache = await database_sync_to_async(lambda: list(self.user.get_friends()))()
+        self._friends_ids = {f.id for f in self._friends_cache}
+
+    # ── Channel event handlers (receive from group_send) ──
+
     async def friend_location(self, event):
-        """Handler for friend location updates"""
         await self.send(text_data=json.dumps({
             'type': 'friend_location',
             'userId': event['userId'],
@@ -233,7 +229,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
         }))
 
     async def public_location(self, event):
-        """Handler for public location updates"""
+        # Don't echo own public location back
+        if event.get('userId') == self.user.id:
+            return
         await self.send(text_data=json.dumps({
             'type': 'public_location',
             'userId': event['userId'],
@@ -241,47 +239,28 @@ class LocationConsumer(AsyncWebsocketConsumer):
             'latitude': event['latitude'],
             'longitude': event['longitude'],
             'accuracy': event['accuracy'],
-            'timestamp': event['timestamp']
+            'timestamp': event['timestamp'],
+        }))
+
+    async def user_offline(self, event):
+        # Don't echo own offline event
+        if event.get('userId') == self.user.id:
+            return
+        await self.send(text_data=json.dumps({
+            'type': 'user_offline',
+            'userId': event['userId'],
         }))
 
     async def friend_details(self, event):
-        """Handler for friend details updates"""
         await self.send(text_data=json.dumps({
             'type': 'friend_details',
             'userId': event['userId'],
             'name': event['name'],
             'friends': event['friends'],
-            'skills': event['skills']
+            'skills': event['skills'],
         }))
-
-    async def user_offline(self, event):
-        """Handler for user offline notifications"""
-        await self.send(text_data=json.dumps({
-            'type': 'user_offline',
-            'userId': event['userId']
-        }))
-
-    async def location_update(self, event):
-        # Send location update with user identification
-        await self.send(text_data=json.dumps({
-            'type': event['type'],
-            'userId': event['userId'],
-            'name': event['name'],
-            'latitude': event['latitude'],
-            'longitude': event['longitude'],
-            'timestamp': event['timestamp']
-        }))
-
-    async def save_user_location(self, user, latitude, longitude):
-        user.latitude = latitude
-        user.longitude = longitude
-        user.timestamp = timezone.now()
-        await database_sync_to_async(
-            lambda: user.save(update_fields=['latitude', 'longitude', 'timestamp'])
-        )()
 
     async def chat_message(self, event):
-        """Handler for chat messages"""
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': event['message'],
@@ -296,6 +275,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     async def user_stats_update(self, event):
+        # Refresh profile cache since stats/skills may have changed
+        await database_sync_to_async(self.user.refresh_from_db)()
+        self._profile_refreshed_at = _time.monotonic()
         await self.send(text_data=json.dumps(event))
 
     async def achievement_earned(self, event):
@@ -305,69 +287,15 @@ class LocationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     async def friend_request_accepted(self, event):
+        await self._refresh_friends_cache()
         await self.send(text_data=json.dumps(event))
 
     async def friend_request_rejected(self, event):
         await self.send(text_data=json.dumps(event))
 
     async def friend_removed(self, event):
+        await self._refresh_friends_cache()
         await self.send(text_data=json.dumps(event))
 
     async def friend_online(self, event):
         await self.send(text_data=json.dumps(event))
-
-class ChatConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        query_string = self.scope['query_string'].decode()
-        query_params = parse_qs(query_string)
-        self.token = query_params.get('token', [None])[0]
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f"chat_{self.room_name}"
-
-        try:
-            token = await database_sync_to_async(Token.objects.get)(key=self.token)
-            self.user = await sync_to_async(lambda: token.user)()
-
-            if self.user.is_authenticated:
-                # Join room group
-                await self.channel_layer.group_add(
-                    self.room_group_name,
-                    self.channel_name
-                )
-
-                await self.accept()
-            else:
-                await self.close() # Close the connection if not authenticated
-        except Token.DoesNotExist:
-            await self.close()
-
-    async def disconnect(self, close_code):
-        if hasattr(self, 'room_group_name'):
-            await self.channel_layer.group_discard(
-                self.room_group_name,
-                self.channel_name
-            )
-
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        message = text_data_json['message']
-
-        # Send message to room group
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message
-            }
-        )
-
-    # Receive message from room group
-    async def chat_message(self, event):
-        message = self.user.username + ': ' + event['message']
-
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': message
-        }))
-
