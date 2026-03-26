@@ -90,7 +90,9 @@ class TutorialTaskStartView(APIView):
         # Proximity check
         if tutorial.lat is not None and tutorial.lon is not None:
             config = GlobalConfig.get_config()
-            distance_km = haversine_km(request.user.latitude, request.user.longitude, tutorial.lat, tutorial.lon)
+            user_lat = float(request.data.get('latitude', request.user.latitude))
+            user_lon = float(request.data.get('longitude', request.user.longitude))
+            distance_km = haversine_km(user_lat, user_lon, tutorial.lat, tutorial.lon)
             if distance_km > config.task_proximity_km:
                 return Response(
                     {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},

@@ -29,7 +29,10 @@ class TaskStartView(APIView):
 
             if task.lat is not None and task.lon is not None:
                 config = GlobalConfig.get_config()
-                distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
+                # Use client-provided position if available, fall back to DB
+                user_lat = float(request.data.get('latitude', request.user.latitude))
+                user_lon = float(request.data.get('longitude', request.user.longitude))
+                distance_km = haversine_km(user_lat, user_lon, task.lat, task.lon)
                 if distance_km > config.task_proximity_km:
                     return Response(
                         {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
@@ -138,7 +141,9 @@ class TaskResumeView(APIView):
 
             if task.lat is not None and task.lon is not None:
                 config = GlobalConfig.get_config()
-                distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
+                user_lat = float(request.data.get('latitude', request.user.latitude))
+                user_lon = float(request.data.get('longitude', request.user.longitude))
+                distance_km = haversine_km(user_lat, user_lon, task.lat, task.lon)
                 if distance_km > config.task_proximity_km:
                     return Response(
                         {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
