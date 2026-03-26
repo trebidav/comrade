@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 
-from .models import Skill, Task, User, LocationConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage
+from .models import Skill, Task, User, LocationConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage, BugReport, BugReportScreenshot
 
 
 class UserChangeForm(UserChangeForm):
@@ -230,3 +230,24 @@ admin.site.register(TutorialProgress, TutorialProgressAdmin)
 admin.site.register(Achievement, AchievementAdmin)
 admin.site.register(UserAchievement, UserAchievementAdmin)
 admin.site.register(ChatMessage, ChatMessageAdmin)
+
+
+class BugReportScreenshotInline(admin.TabularInline):
+    model = BugReportScreenshot
+    extra = 0
+    readonly_fields = ['image', 'order']
+
+
+class BugReportAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'description_short', 'screen_size', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['description', 'user__username']
+    readonly_fields = ['user', 'description', 'user_agent', 'url', 'screen_size', 'location', 'created_at']
+    inlines = [BugReportScreenshotInline]
+
+    def description_short(self, obj):
+        return obj.description[:80] + ('...' if len(obj.description) > 80 else '')
+    description_short.short_description = 'Description'
+
+
+admin.site.register(BugReport, BugReportAdmin)

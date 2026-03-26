@@ -14,6 +14,7 @@ import AchievementToasts from './AchievementToast'
 import BottomSheet from './BottomSheet'
 import { useLocationSocket } from '../hooks/useLocationSocket'
 import { IconTasks, IconChat, IconPerson, IconCenterOnMe, IconPlus } from './Icons'
+import BugReportModal from './BugReportModal'
 
 // Fix default marker icons broken by vite bundling
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -249,6 +250,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
   const [activeSheet, setActiveSheet] = useState<MainSheet>(null)
+  const [showBugReport, setShowBugReport] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [animatingTab, setAnimatingTab] = useState<MainSheet | 'map' | null>(null)
   const [chatUnread, setChatUnread] = useState(0)
@@ -579,6 +581,40 @@ export default function MapView({ user, onLogout }: Props) {
       />
 
       {/* Profile button — top right corner */}
+      {/* Bug report button — top left */}
+      <button
+        onClick={() => setShowBugReport(true)}
+        style={{
+          position: 'fixed',
+          top: `calc(var(--safe-top) + 12px)`,
+          left: '14px',
+          zIndex: 1100,
+          width: '42px',
+          height: '42px',
+          borderRadius: '50%',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          border: '2px solid var(--glass-border)',
+          color: 'var(--pip-green)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          boxShadow: 'var(--glass-shadow)',
+          transition: 'transform 0.12s var(--spring)',
+          animation: 'scaleIn 0.4s var(--spring) 0.1s both',
+          fontSize: '1.2rem',
+        }}
+        onPointerDown={(e) => (e.currentTarget.style.transform = 'scale(0.88)')}
+        onPointerUp={(e) => (e.currentTarget.style.transform = '')}
+        onPointerLeave={(e) => (e.currentTarget.style.transform = '')}
+        title="Report a bug"
+      >
+        &#128027;
+      </button>
+
       <button
         onClick={() => setActiveSheet(activeSheet === 'profile' ? null : 'profile')}
         style={{
@@ -774,6 +810,14 @@ export default function MapView({ user, onLogout }: Props) {
           userSkills={currentUser.skills}
           onCreated={fetchTasks}
           onClose={() => setCreateTaskPos(null)}
+        />
+      )}
+
+      {/* Bug report modal */}
+      {showBugReport && (
+        <BugReportModal
+          selfLocation={selfLocation}
+          onClose={() => setShowBugReport(false)}
         />
       )}
     </div>

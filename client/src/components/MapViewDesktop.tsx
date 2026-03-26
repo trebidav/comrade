@@ -13,6 +13,7 @@ import UserInfoPanel from './UserInfoPanelDesktop'
 
 import AchievementToasts from './AchievementToast'
 import { useLocationSocket } from '../hooks/useLocationSocket'
+import BugReportModal from './BugReportModal'
 
 // Fix default marker icons broken by vite bundling
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -218,6 +219,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [pauseMultiplier, setPauseMultiplier] = useState(1.0)
   const [achievementToasts, setAchievementToasts] = useState<NewAchievement[]>([])
   const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
+  const [showBugReport, setShowBugReport] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
 
   // Apply persisted theme on mount and listen for changes
@@ -638,10 +640,39 @@ export default function MapView({ user, onLogout }: Props) {
           {/* Chat - bottom left */}
           <Chat messages={chatMessages} onSend={sendChatMessage} />
 
-          {/* Bottom-right: Center on Me */}
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000 }}>
+          {/* Bottom-right: Bug report + Center on Me */}
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+            <button
+              onClick={() => setShowBugReport(true)}
+              title="Report a bug"
+              style={{
+                width: '40px', height: '40px', borderRadius: '50%',
+                background: 'var(--glass-bg, rgba(10,15,13,0.85))',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '2px solid var(--glass-border, rgba(52,168,83,0.2))',
+                color: 'var(--pip-green, #34A853)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', fontSize: '1.1rem',
+                boxShadow: 'var(--glass-shadow, 0 2px 8px rgba(0,0,0,0.3))',
+                transition: 'transform 0.12s',
+              }}
+              onPointerDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+              onPointerUp={(e) => (e.currentTarget.style.transform = '')}
+              onPointerLeave={(e) => (e.currentTarget.style.transform = '')}
+            >
+              &#128027;
+            </button>
             <CenterOnMeInOverlay selfLat={selfLocation?.lat ?? null} selfLon={selfLocation?.lon ?? null} />
           </div>
+
+          {/* Bug report modal */}
+          {showBugReport && (
+            <BugReportModal
+              selfLocation={selfLocation}
+              onClose={() => setShowBugReport(false)}
+            />
+          )}
         </div>
       </div>
     </div>
