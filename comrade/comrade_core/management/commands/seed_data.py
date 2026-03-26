@@ -162,7 +162,7 @@ class Command(BaseCommand):
                 state=Task.State.OPEN,
                 owner=owner,
                 criticality=criticality,
-                base_value=base_value,
+                coins=base_value,
                 minutes=minutes,
             )
             task.save()
