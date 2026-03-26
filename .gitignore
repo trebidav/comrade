@@ -165,3 +165,9 @@ cython_debug/
 
 # Redis
 **/dump.rdb
+
+# Vite cache
+client/.vite/
+
+# User-uploaded media
+comrade/media/
