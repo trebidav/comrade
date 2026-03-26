@@ -647,7 +647,7 @@ export default function MapView({ user, onLogout }: Props) {
               className="pip-btn pip-btn-primary"
               style={{ padding: '8px 14px', fontSize: '0.75rem', width: '100%' }}
             >
-              &#128027; Report Bug
+              Report Bug
             </button>
             <CenterOnMeInOverlay selfLat={selfLocation?.lat ?? null} selfLon={selfLocation?.lon ?? null} />
           </div>

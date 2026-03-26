@@ -13,7 +13,7 @@ import UserInfoPanel from './UserInfoPanel'
 import AchievementToasts from './AchievementToast'
 import BottomSheet from './BottomSheet'
 import { useLocationSocket } from '../hooks/useLocationSocket'
-import { IconTasks, IconChat, IconPerson, IconCenterOnMe, IconPlus } from './Icons'
+import { IconTasks, IconChat, IconPerson, IconCenterOnMe, IconPlus, IconBug } from './Icons'
 import BugReportModal from './BugReportModal'
 
 // Fix default marker icons broken by vite bundling
@@ -612,7 +612,7 @@ export default function MapView({ user, onLogout }: Props) {
         onPointerLeave={(e) => (e.currentTarget.style.transform = '')}
         title="Report a bug"
       >
-        &#128027;
+        <IconBug size={20} />
       </button>
 
       <button

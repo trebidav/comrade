@@ -162,6 +162,27 @@ export function IconCenterOnMe({ size = 24, color = 'currentColor' }: { size?: n
   )
 }
 
+export function IconBug({ size = defaults.size, color = defaults.color, style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" style={style}>
+      {/* Body */}
+      <ellipse cx="11" cy="13" rx="5" ry="6" stroke={color} strokeWidth="1.7" />
+      {/* Head */}
+      <circle cx="11" cy="6" r="2.5" stroke={color} strokeWidth="1.7" />
+      {/* Antennae */}
+      <line x1="9" y1="4.5" x2="6" y2="1.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="13" y1="4.5" x2="16" y2="1.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Legs */}
+      <line x1="6.5" y1="10" x2="3" y2="8.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="6.5" y1="14" x2="3" y2="15.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="15.5" y1="10" x2="19" y2="8.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="15.5" y1="14" x2="19" y2="15.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Middle line */}
+      <line x1="11" y1="8.5" x2="11" y2="18" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function IconPlus({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
