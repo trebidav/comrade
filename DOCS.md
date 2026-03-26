@@ -158,6 +158,8 @@ Criticality levels: LOW (1), MEDIUM (2), HIGH (3).
 
 Users must be within `GlobalConfig.task_proximity_km` (default 200m) of the task to start or resume it. Distance is calculated using the Haversine formula.
 
+The frontend sends the user's current GPS coordinates (`latitude`, `longitude`) in the request body of start/resume calls. The backend uses these client-provided coordinates for the proximity check, falling back to the DB-stored position if not provided. This avoids rejection due to stale location from the periodic WebSocket ping (~5s interval).
+
 ---
 
 ## Tutorial System

@@ -334,7 +334,11 @@ export default function MapView({ user, onLogout }: Props) {
     const realId = taskInfo ? realTaskId(taskInfo) : taskId
     const urlPrefix = isTutorial && (action === 'start' || action === 'abandon') ? 'tutorial_task' : 'task'
     try {
-      const res = await api.post(`/${urlPrefix}/${realId}/${action}`)
+      // Include fresh GPS for proximity-sensitive actions
+      const body = (action === 'start' || action === 'resume') && selfLocation
+        ? { latitude: selfLocation.lat, longitude: selfLocation.lon }
+        : undefined
+      const res = await api.post(`/${urlPrefix}/${realId}/${action}`, body)
       await fetchTasks()
       if (action === 'accept_review' || action === 'finish') {
         await fetchUser()
