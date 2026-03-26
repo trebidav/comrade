@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from ..utils import haversine_km, compute_level
-from .config import LocationConfig
+from .config import GlobalConfig
 
 
 class User(AbstractUser):
@@ -64,14 +64,14 @@ class User(AbstractUser):
     @property
     def level(self) -> int:
         """Compute current level from total_xp_earned."""
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         lvl, _, _ = compute_level(self.total_xp_earned, config.level_modifier)
         return lvl
 
     @property
     def level_progress(self) -> dict:
         """Return current level, XP into current level, and XP required for next level."""
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         lvl, current_xp, required_xp = compute_level(self.total_xp_earned, config.level_modifier)
         return {'level': lvl, 'current_xp': current_xp, 'required_xp': required_xp}
 

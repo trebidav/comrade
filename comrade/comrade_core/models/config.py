@@ -7,7 +7,7 @@ _config_cache = {'obj': None, 'ts': 0}
 _CONFIG_TTL = 60  # seconds
 
 
-class LocationConfig(models.Model):
+class GlobalConfig(models.Model):
     """Global configuration for location sharing, task proximity, and rewards"""
     max_distance_km = models.FloatField(
         default=1.0,
@@ -74,4 +74,4 @@ class LocationConfig(models.Model):
         return config
 
     def __str__(self):
-        return f"Location config (sharing: {self.max_distance_km}km, task proximity: {self.task_proximity_km}km)"
+        return f"Global config (sharing: {self.max_distance_km}km, task proximity: {self.task_proximity_km}km)"

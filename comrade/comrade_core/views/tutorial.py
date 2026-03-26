@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import LocationConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress
+from ..models import GlobalConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
 from ..ws_events import send_user_stats, send_achievements
@@ -89,7 +89,7 @@ class TutorialTaskStartView(APIView):
 
         # Proximity check
         if tutorial.lat is not None and tutorial.lon is not None:
-            config = LocationConfig.get_config()
+            config = GlobalConfig.get_config()
             distance_km = haversine_km(request.user.latitude, request.user.longitude, tutorial.lat, tutorial.lon)
             if distance_km > config.task_proximity_km:
                 return Response(

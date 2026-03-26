@@ -1,4 +1,4 @@
-from .config import LocationConfig
+from .config import GlobalConfig
 from .skill import Skill
 from .user import User
 from .task import Task, Rating, Review
@@ -8,7 +8,7 @@ from .chat import ChatMessage
 from .bug_report import BugReport, BugReportScreenshot
 
 __all__ = [
-    'LocationConfig', 'Skill', 'User', 'Task', 'Rating', 'Review',
+    'GlobalConfig', 'Skill', 'User', 'Task', 'Rating', 'Review',
     'Achievement', 'UserAchievement',
     'TutorialTask', 'TutorialPart', 'TutorialQuestion', 'TutorialAnswer', 'TutorialProgress',
     'ChatMessage',

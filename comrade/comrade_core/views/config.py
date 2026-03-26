@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import LocationConfig, Achievement, Skill
+from ..models import GlobalConfig, Achievement, Skill
 from ..serializers import SkillSerializer
 
 
@@ -11,7 +11,7 @@ class ProximitySettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         return Response({
             'radius_km': config.task_proximity_km,
             'max_distance_km': config.max_distance_km,
@@ -32,13 +32,13 @@ class GlobalConfigView(APIView):
     def get(self, request):
         if not request.user.is_superuser:
             return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         return Response({f: getattr(config, f) for f in self.FIELDS})
 
     def patch(self, request):
         if not request.user.is_superuser:
             return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         updated = []
         for field in self.FIELDS:
             if field in request.data:

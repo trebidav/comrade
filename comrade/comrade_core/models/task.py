@@ -6,7 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.timezone import now
 
-from .config import LocationConfig
+from .config import GlobalConfig
 
 
 class Task(models.Model):
@@ -196,7 +196,7 @@ class Task(models.Model):
         new_achievements = []
         if self.assignee is not None:
             update_fields = []
-            config = LocationConfig.get_config()
+            config = GlobalConfig.get_config()
             time_multiplier = (self.minutes / config.time_modifier_minutes) if config.time_modifier_minutes > 0 else 1.0
             criticality_factor = 1.0 + (self.criticality - 1) * config.criticality_percentage
             if self.coins is not None:
@@ -275,7 +275,7 @@ class Task(models.Model):
         """Abandon WAITING tasks that have been paused longer than their estimated minutes x pause_multiplier."""
         from datetime import timedelta as _td
         from django.db.models import F, ExpressionWrapper, DurationField
-        config = LocationConfig.get_config()
+        config = GlobalConfig.get_config()
         cutoff = ExpressionWrapper(
             _td(minutes=1) * F('minutes') * config.pause_multiplier,
             output_field=DurationField(),
