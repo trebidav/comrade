@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **See [../DOCS.md](../DOCS.md)** for comprehensive documentation of all features, processes, and application logic.
+
 ## Local Development
 
 ### Required services (3 terminals)
