@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models import ChatMessage, LocationConfig
+from ..models import ChatMessage, GlobalConfig
 
 
 @api_view(['GET'])
@@ -35,7 +35,7 @@ def welcome_message(request):
     """Return the welcome message if the user has not accepted it yet."""
     if request.user.welcome_accepted:
         return Response({'show': False}, status=status.HTTP_200_OK)
-    config = LocationConfig.get_config()
+    config = GlobalConfig.get_config()
     return Response({'show': True, 'message': config.welcome_message}, status=status.HTTP_200_OK)
 
 

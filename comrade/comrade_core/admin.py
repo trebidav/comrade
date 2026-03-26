@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 
-from .models import Skill, Task, User, LocationConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage, BugReport, BugReportScreenshot
+from .models import Skill, Task, User, GlobalConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage, BugReport, BugReportScreenshot
 
 
 class UserChangeForm(UserChangeForm):
@@ -98,7 +98,7 @@ class SkillAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
-class LocationConfigAdmin(admin.ModelAdmin):
+class GlobalConfigAdmin(admin.ModelAdmin):
     list_display = ['max_distance_km', 'task_proximity_km', 'coins_modifier', 'xp_modifier', 'time_modifier_minutes', 'criticality_percentage', 'pause_multiplier', 'level_modifier', 'last_updated']
     readonly_fields = ['last_updated']
     fieldsets = (
@@ -220,7 +220,7 @@ class ChatMessageAdmin(admin.ModelAdmin):
 admin.site.register(User, ComradeUserAdmin)
 admin.site.register(Task, TaskAdmin)
 admin.site.register(Skill, SkillAdmin)
-admin.site.register(LocationConfig, LocationConfigAdmin)
+admin.site.register(GlobalConfig, GlobalConfigAdmin)
 admin.site.register(Rating, RatingAdmin)
 admin.site.register(Review, ReviewAdmin)
 admin.site.register(TutorialTask, TutorialTaskAdmin)

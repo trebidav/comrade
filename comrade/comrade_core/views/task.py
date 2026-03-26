@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Task, Rating, Review, Skill, LocationConfig, TutorialTask, TutorialProgress
+from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
 from ..ws_events import send_task_update, send_user_stats, send_achievements
@@ -29,7 +29,7 @@ class TaskStartView(APIView):
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
             if task.lat is not None and task.lon is not None:
-                config = LocationConfig.get_config()
+                config = GlobalConfig.get_config()
                 distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
                 if distance_km > config.task_proximity_km:
                     return Response(
@@ -138,7 +138,7 @@ class TaskResumeView(APIView):
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
             if task.lat is not None and task.lon is not None:
-                config = LocationConfig.get_config()
+                config = GlobalConfig.get_config()
                 distance_km = haversine_km(request.user.latitude, request.user.longitude, task.lat, task.lon)
                 if distance_km > config.task_proximity_km:
                     return Response(

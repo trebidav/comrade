@@ -80,7 +80,7 @@ comrade/                          # Git repo root
 Levels are computed from `total_xp_earned`:
 - Base: 1000 XP per level
 - Scaling: +10% per level (1.1^level)
-- Global modifier: `LocationConfig.level_modifier`
+- Global modifier: `GlobalConfig.level_modifier`
 - Formula: `required_xp = 1000 * modifier * (1.1 ^ level)`
 
 The `level` and `level_progress` are computed properties (not stored).
@@ -156,7 +156,7 @@ Criticality levels: LOW (1), MEDIUM (2), HIGH (3).
 
 ### Task Proximity
 
-Users must be within `LocationConfig.task_proximity_km` (default 200m) of the task to start or resume it. Distance is calculated using the Haversine formula.
+Users must be within `GlobalConfig.task_proximity_km` (default 200m) of the task to start or resume it. Distance is calculated using the Haversine formula.
 
 ---
 
@@ -348,7 +348,7 @@ Reports are only visible in Django admin (not shown to users).
 
 ## Admin Configuration
 
-### LocationConfig (Singleton)
+### GlobalConfig (Singleton)
 
 All gamification and proximity parameters are controlled from Django admin.
 
