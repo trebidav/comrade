@@ -590,3 +590,4 @@ Access at **http://localhost:3000**. Vite proxies `/api`, `/ws`, `/media` to Dja
 - **Backend errors:** Sentry SDK → Better Stack (`comrade_core` logger at INFO in prod)
 - **Frontend errors:** Sentry React SDK → Better Stack (production only)
 - **Frontend metrics:** Better Stack JS tag (web vitals, session replays)
+- **Status page:** https://status.demo.comrade.live
