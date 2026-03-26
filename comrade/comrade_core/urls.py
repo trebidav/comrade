@@ -39,6 +39,7 @@ urlpatterns = [
     path('chat/history/', views.chat_history, name='chat_history'),
     path('welcome/', views.welcome_message, name='welcome_message'),
     path('welcome/accept/', views.welcome_accept, name='welcome_accept'),
+    path('bug-report/', views.BugReportView.as_view(), name='bug_report'),
 ]
 
 websocket_urlpatterns = [

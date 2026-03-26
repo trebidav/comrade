@@ -13,6 +13,7 @@ import UserInfoPanel from './UserInfoPanelDesktop'
 
 import AchievementToasts from './AchievementToast'
 import { useLocationSocket } from '../hooks/useLocationSocket'
+import BugReportModal from './BugReportModal'
 
 // Fix default marker icons broken by vite bundling
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -218,6 +219,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [pauseMultiplier, setPauseMultiplier] = useState(1.0)
   const [achievementToasts, setAchievementToasts] = useState<NewAchievement[]>([])
   const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
+  const [showBugReport, setShowBugReport] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
 
   // Apply persisted theme on mount and listen for changes
@@ -638,10 +640,25 @@ export default function MapView({ user, onLogout }: Props) {
           {/* Chat - bottom left */}
           <Chat messages={chatMessages} onSend={sendChatMessage} />
 
-          {/* Bottom-right: Center on Me */}
-          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000 }}>
+          {/* Bottom-right: Bug report + Center on Me */}
+          <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch', width: 'auto' }}>
+            <button
+              onClick={() => setShowBugReport(true)}
+              className="pip-btn pip-btn-primary"
+              style={{ padding: '8px 14px', fontSize: '0.75rem', width: '100%' }}
+            >
+              Report Bug
+            </button>
             <CenterOnMeInOverlay selfLat={selfLocation?.lat ?? null} selfLon={selfLocation?.lon ?? null} />
           </div>
+
+          {/* Bug report modal */}
+          {showBugReport && (
+            <BugReportModal
+              selfLocation={selfLocation}
+              onClose={() => setShowBugReport(false)}
+            />
+          )}
         </div>
       </div>
     </div>

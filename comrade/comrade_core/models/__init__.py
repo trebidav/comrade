@@ -5,10 +5,12 @@ from .task import Task, Rating, Review
 from .achievement import Achievement, UserAchievement
 from .tutorial import TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
 from .chat import ChatMessage
+from .bug_report import BugReport, BugReportScreenshot
 
 __all__ = [
     'LocationConfig', 'Skill', 'User', 'Task', 'Rating', 'Review',
     'Achievement', 'UserAchievement',
     'TutorialTask', 'TutorialPart', 'TutorialQuestion', 'TutorialAnswer', 'TutorialProgress',
     'ChatMessage',
+    'BugReport', 'BugReportScreenshot',
 ]
