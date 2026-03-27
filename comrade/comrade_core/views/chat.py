@@ -61,17 +61,24 @@ def welcome_accept(request):
     lat = request.data.get('latitude')
     lon = request.data.get('longitude')
 
-    # Spawn onboarding tutorials if location provided
+    # Spawn onboarding items if location provided
     if lat is not None and lon is not None:
         lat, lon = float(lat), float(lon)
-        from comrade_core.models import OnboardingTemplate, UserOnboardingTutorial
-        for template in OnboardingTemplate.objects.filter(is_active=True).select_related('tutorial'):
+        from comrade_core.models import OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
+        for template in OnboardingTemplate.objects.filter(is_active=True).select_related('tutorial', 'task'):
             spawn_lat, spawn_lon = _random_point_within(lat, lon, template.spawn_radius_meters)
-            UserOnboardingTutorial.objects.get_or_create(
-                user=request.user,
-                tutorial=template.tutorial,
-                defaults={'lat': spawn_lat, 'lon': spawn_lon},
-            )
+            if template.tutorial_id:
+                UserOnboardingTutorial.objects.get_or_create(
+                    user=request.user,
+                    tutorial=template.tutorial,
+                    defaults={'lat': spawn_lat, 'lon': spawn_lon},
+                )
+            elif template.task_id:
+                UserOnboardingTask.objects.get_or_create(
+                    user=request.user,
+                    task=template.task,
+                    defaults={'lat': spawn_lat, 'lon': spawn_lon},
+                )
 
     request.user.welcome_accepted = True
     request.user.save(update_fields=['welcome_accepted'])

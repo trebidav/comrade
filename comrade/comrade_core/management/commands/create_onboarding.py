@@ -89,7 +89,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"  Tutorial 3 exists: {t3.name} (id={t3.id})")
 
-        # ── Onboarding Templates ──
+        # ── Onboarding Templates (tutorials) ──
         for order, tutorial in enumerate([t1, t2, t3]):
             obj, created = OnboardingTemplate.objects.get_or_create(
                 tutorial=tutorial,
@@ -136,5 +136,14 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"  Task created: {task2.name} (id={task2.id})"))
         else:
             self.stdout.write(f"  Task exists: {task2.name} (id={task2.id})")
+
+        # ── Onboarding Templates (tasks) ──
+        for order_offset, task_obj in enumerate([task1, task2], start=len([t1, t2, t3])):
+            obj, created = OnboardingTemplate.objects.get_or_create(
+                task=task_obj,
+                defaults={'order': order_offset, 'spawn_radius_meters': 200, 'is_active': True},
+            )
+            label = "created" if created else "exists"
+            self.stdout.write(f"  OnboardingTemplate {label}: order={order_offset} → {task_obj.name}")
 
         self.stdout.write(self.style.SUCCESS("\nOnboarding setup complete!"))

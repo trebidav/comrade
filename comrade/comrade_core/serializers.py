@@ -27,6 +27,8 @@ class TaskSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     pending_review = serializers.SerializerMethodField()
     is_tutorial = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    lon = serializers.SerializerMethodField()
 
     def get_skill_execute_names(self, obj):
         return [skill.name for skill in obj.skill_execute.all()]
@@ -41,6 +43,12 @@ class TaskSerializer(serializers.ModelSerializer):
         if obj.assignee:
             return f"{obj.assignee.first_name} {obj.assignee.last_name}".strip() or obj.assignee.username
         return None
+
+    def get_lat(self, obj):
+        return getattr(obj, '_user_lat', obj.lat)
+
+    def get_lon(self, obj):
+        return getattr(obj, '_user_lon', obj.lon)
 
     def get_is_tutorial(self, obj):
         return False

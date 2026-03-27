@@ -110,17 +110,29 @@ class TutorialProgress(models.Model):
 
 
 class OnboardingTemplate(models.Model):
-    """Admin-configured template: which tutorials to spawn when a user accepts T&C."""
-    tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='onboarding_templates')
+    """Admin-configured template: which items to spawn when a user accepts T&C.
+
+    Set either `tutorial` or `task` (not both). The chosen item is spawned
+    at a random position around the user on T&C acceptance.
+    """
+    tutorial = models.ForeignKey(
+        TutorialTask, null=True, blank=True, on_delete=models.CASCADE,
+        related_name='onboarding_templates',
+    )
+    task = models.ForeignKey(
+        'comrade_core.Task', null=True, blank=True, on_delete=models.CASCADE,
+        related_name='onboarding_templates',
+    )
     order = models.PositiveIntegerField(default=0)
-    spawn_radius_meters = models.PositiveIntegerField(default=100, help_text="Max distance from user to spawn this tutorial")
+    spawn_radius_meters = models.PositiveIntegerField(default=100, help_text="Max distance from user to spawn")
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['order']
 
     def __str__(self):
-        return f"Onboarding #{self.order}: {self.tutorial.name}"
+        item = self.tutorial or self.task
+        return f"Onboarding #{self.order}: {item}"
 
 
 class UserOnboardingTutorial(models.Model):
@@ -136,3 +148,18 @@ class UserOnboardingTutorial(models.Model):
 
     def __str__(self):
         return f"{self.user.username} – {self.tutorial.name} @ ({self.lat:.5f}, {self.lon:.5f})"
+
+
+class UserOnboardingTask(models.Model):
+    """Per-user spawned task instance with personalized location."""
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='onboarding_tasks')
+    task = models.ForeignKey('comrade_core.Task', on_delete=models.CASCADE, related_name='user_onboarding')
+    lat = models.FloatField()
+    lon = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'task']
+
+    def __str__(self):
+        return f"{self.user.username} – {self.task.name} @ ({self.lat:.5f}, {self.lon:.5f})"

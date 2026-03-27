@@ -8,7 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial
+from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
 from ..ws_events import send_task_update, send_user_stats, send_achievements
@@ -27,12 +27,19 @@ class TaskStartView(APIView):
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            if task.lat is not None and task.lon is not None:
+            # Use per-user onboarding location if available, else task's own location
+            task_lat, task_lon = task.lat, task.lon
+            try:
+                uo = UserOnboardingTask.objects.get(user=request.user, task=task)
+                task_lat, task_lon = uo.lat, uo.lon
+            except UserOnboardingTask.DoesNotExist:
+                pass
+
+            if task_lat is not None and task_lon is not None:
                 config = GlobalConfig.get_config()
-                # Use client-provided position if available, fall back to DB
                 user_lat = float(request.data.get('latitude', request.user.latitude))
                 user_lon = float(request.data.get('longitude', request.user.longitude))
-                distance_km = haversine_km(user_lat, user_lon, task.lat, task.lon)
+                distance_km = haversine_km(user_lat, user_lon, task_lat, task_lon)
                 if distance_km > config.task_proximity_km:
                     return Response(
                         {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
@@ -139,11 +146,18 @@ class TaskResumeView(APIView):
             except Task.DoesNotExist:
                 return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            if task.lat is not None and task.lon is not None:
+            task_lat, task_lon = task.lat, task.lon
+            try:
+                uo = UserOnboardingTask.objects.get(user=request.user, task=task)
+                task_lat, task_lon = uo.lat, uo.lon
+            except UserOnboardingTask.DoesNotExist:
+                pass
+
+            if task_lat is not None and task_lon is not None:
                 config = GlobalConfig.get_config()
                 user_lat = float(request.data.get('latitude', request.user.latitude))
                 user_lon = float(request.data.get('longitude', request.user.longitude))
-                distance_km = haversine_km(user_lat, user_lon, task.lat, task.lon)
+                distance_km = haversine_km(user_lat, user_lon, task_lat, task_lon)
                 if distance_km > config.task_proximity_km:
                     return Response(
                         {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},
@@ -171,7 +185,21 @@ class TaskListView(APIView):
         # Visibility rules:
         # - Always visible: owned tasks, assigned tasks, write-skill IN_REVIEW tasks
         # - Otherwise: visible if task has no read skills OR user has a matching read skill
-        tasks = Task.objects.filter(
+        # Get onboarding template IDs (tutorials + tasks)
+        onboarding_tutorial_ids = set(
+            OnboardingTemplate.objects.filter(is_active=True, tutorial__isnull=False).values_list('tutorial_id', flat=True)
+        )
+        onboarding_task_ids = set(
+            OnboardingTemplate.objects.filter(is_active=True, task__isnull=False).values_list('task_id', flat=True)
+        )
+
+        # Get user's spawned onboarding tasks (per-user lat/lon)
+        user_onboarding_tasks = {
+            uo.task_id: uo
+            for uo in UserOnboardingTask.objects.filter(user=user)
+        }
+
+        tasks_qs = Task.objects.filter(
             models.Q(owner=user)
             | models.Q(assignee=user)
             | models.Q(state=Task.State.IN_REVIEW, skill_write__in=user.skills.all())
@@ -179,15 +207,21 @@ class TaskListView(APIView):
             | models.Q(skill_read__in=user.skills.all())
         ).distinct().select_related('owner', 'assignee').prefetch_related('skill_execute', 'skill_read', 'skill_write', 'reviews')
 
+        # Filter onboarding-template tasks: only show if spawned for this user, override lat/lon
+        tasks = []
+        for t in tasks_qs:
+            if t.id in onboarding_task_ids:
+                uo = user_onboarding_tasks.get(t.id)
+                if uo:
+                    t._user_lat = uo.lat
+                    t._user_lon = uo.lon
+                    tasks.append(t)
+            else:
+                tasks.append(t)
+
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         # Tutorial tasks: only show if user doesn't already have the reward skill
-        # Prefetch skill_execute + reward_skill; batch-fetch in_progress status
-
-        # Get IDs of tutorials that are onboarding templates
-        onboarding_template_ids = set(
-            OnboardingTemplate.objects.filter(is_active=True).values_list('tutorial_id', flat=True)
-        )
 
         # Get user's spawned onboarding tutorials
         user_onboarding = {
@@ -205,7 +239,7 @@ class TaskListView(APIView):
 
         tutorial_tasks = []
         for t in tutorial_tasks_qs:
-            if t.id in onboarding_template_ids:
+            if t.id in onboarding_tutorial_ids:
                 # Onboarding template — only show if spawned for this user
                 uo = user_onboarding.get(t.id)
                 if uo:
