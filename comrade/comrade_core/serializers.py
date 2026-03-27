@@ -190,6 +190,8 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     is_tutorial = serializers.SerializerMethodField()
     skill_execute_names = serializers.SerializerMethodField()
     in_progress = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    lon = serializers.SerializerMethodField()
 
     reward_skill_name = serializers.SerializerMethodField()
 
@@ -201,6 +203,12 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
 
     def get_skill_execute_names(self, obj):
         return [s.name for s in obj.skill_execute.all()]
+
+    def get_lat(self, obj):
+        return getattr(obj, '_user_lat', obj.lat)
+
+    def get_lon(self, obj):
+        return getattr(obj, '_user_lon', obj.lon)
 
     def get_in_progress(self, obj):
         in_progress_ids = self.context.get('in_progress_ids')

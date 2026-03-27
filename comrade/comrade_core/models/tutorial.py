@@ -107,3 +107,32 @@ class TutorialProgress(models.Model):
     def is_complete(self):
         total = self.tutorial.parts.count()
         return total > 0 and self.completed_parts.count() >= total
+
+
+class OnboardingTemplate(models.Model):
+    """Admin-configured template: which tutorials to spawn when a user accepts T&C."""
+    tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='onboarding_templates')
+    order = models.PositiveIntegerField(default=0)
+    spawn_radius_meters = models.PositiveIntegerField(default=100, help_text="Max distance from user to spawn this tutorial")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Onboarding #{self.order}: {self.tutorial.name}"
+
+
+class UserOnboardingTutorial(models.Model):
+    """Per-user spawned tutorial instance with personalized location."""
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='onboarding_tutorials')
+    tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='user_onboarding')
+    lat = models.FloatField()
+    lon = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'tutorial']
+
+    def __str__(self):
+        return f"{self.user.username} – {self.tutorial.name} @ ({self.lat:.5f}, {self.lon:.5f})"

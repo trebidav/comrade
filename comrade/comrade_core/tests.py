@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.authtoken.models import Token
 
-from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
+from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial
 
 
 class TaskTestCase(TestCase):
@@ -414,6 +414,33 @@ class TutorialTest(TestCase):
         self.assertEqual(progress.state, TutorialProgress.State.IN_PROGRESS)
         self.assertEqual(progress.completed_parts.count(), 0)
         self.assertNotIn(skill, self.user.skills.all())
+
+    def test_welcome_accept_spawns_onboarding_tutorials(self):
+        """Accepting T&C with location spawns onboarding tutorials around user."""
+        user = User.objects.create_user(username='newuser', password='pass')
+        skill = Skill.objects.create(name='Onboard')
+        tutorial = TutorialTask.objects.create(name='Welcome Tutorial', reward_skill=skill)
+        TutorialPart.objects.create(tutorial=tutorial, type='text', title='Intro', order=0)
+        OnboardingTemplate.objects.create(tutorial=tutorial, order=0, spawn_radius_meters=200)
+
+        token = Token.objects.create(user=user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        resp = client.post('/api/welcome/accept/', {'latitude': 50.0, 'longitude': 14.0})
+        self.assertEqual(resp.status_code, 200)
+
+        user.refresh_from_db()
+        self.assertTrue(user.welcome_accepted)
+
+        # Check tutorial was spawned
+        uo = UserOnboardingTutorial.objects.get(user=user, tutorial=tutorial)
+        self.assertIsNotNone(uo.lat)
+        self.assertIsNotNone(uo.lon)
+        # Should be within ~200m of the user
+        from comrade_core.utils import haversine_km
+        dist = haversine_km(50.0, 14.0, uo.lat, uo.lon)
+        self.assertLess(dist, 0.3)  # ~300m tolerance for randomness
 
 
 class TaskAPITest(APITestCase):

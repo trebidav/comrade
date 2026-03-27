@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import GlobalConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress
+from ..models import GlobalConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
 from ..ws_events import send_user_stats, send_achievements
@@ -122,12 +122,19 @@ class TutorialTaskStartView(APIView):
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Use per-user onboarding location if available
+        try:
+            uo = UserOnboardingTutorial.objects.get(user=request.user, tutorial=tutorial)
+            tutorial_lat, tutorial_lon = uo.lat, uo.lon
+        except UserOnboardingTutorial.DoesNotExist:
+            tutorial_lat, tutorial_lon = tutorial.lat, tutorial.lon
+
         # Proximity check
-        if tutorial.lat is not None and tutorial.lon is not None:
+        if tutorial_lat is not None and tutorial_lon is not None:
             config = GlobalConfig.get_config()
             user_lat = float(request.data.get('latitude', request.user.latitude))
             user_lon = float(request.data.get('longitude', request.user.longitude))
-            distance_km = haversine_km(user_lat, user_lon, tutorial.lat, tutorial.lon)
+            distance_km = haversine_km(user_lat, user_lon, tutorial_lat, tutorial_lon)
             if distance_km > config.task_proximity_km:
                 return Response(
                     {"error": f"Too far from task ({int(distance_km * 1000)}m away, max {int(config.task_proximity_km * 1000)}m)"},

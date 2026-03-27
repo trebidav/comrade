@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 
-export default function WelcomeModal() {
+interface WelcomeModalProps {
+  selfLocation: { lat: number; lon: number } | null
+  locationError: string | null
+  onAccepted: () => void
+}
+
+export default function WelcomeModal({ selfLocation, locationError, onAccepted }: WelcomeModalProps) {
   const [message, setMessage] = useState('')
   const [visible, setVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     api.get('/welcome/').then((res) => {
@@ -16,13 +23,23 @@ export default function WelcomeModal() {
 
   if (!visible) return null
 
-  const handleAccept = () => {
-    api.post('/welcome/accept/').catch(() => {})
-    setVisible(false)
-  }
+  const canAccept = selfLocation !== null
 
-  const handleDismiss = () => {
-    setVisible(false)
+  const handleAccept = async () => {
+    if (!canAccept || submitting) return
+    setSubmitting(true)
+    try {
+      await api.post('/welcome/accept/', {
+        latitude: selfLocation!.lat,
+        longitude: selfLocation!.lon,
+      })
+      setVisible(false)
+      onAccepted()
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -63,22 +80,6 @@ export default function WelcomeModal() {
           }}>
             Welcome, Comrade
           </span>
-          <button
-            onClick={handleDismiss}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--pip-text)',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              lineHeight: 1,
-              padding: '2px 6px',
-              opacity: 0.7,
-            }}
-            title="Close (will show again next time)"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Body */}
@@ -103,17 +104,45 @@ export default function WelcomeModal() {
         {/* Footer */}
         <div style={{
           display: 'flex',
-          justifyContent: 'flex-end',
+          flexDirection: 'column',
+          gap: '8px',
           padding: '10px 14px',
           borderTop: '1px solid var(--pip-border)',
         }}>
-          <button
-            onClick={handleAccept}
-            className="pip-btn pip-btn-primary"
-            style={{ fontSize: '0.7rem', padding: '6px 18px' }}
-          >
-            Got it
-          </button>
+          {!canAccept && locationError && (
+            <div style={{
+              fontSize: '0.65rem',
+              color: 'var(--pip-danger, #ff6b6b)',
+              lineHeight: 1.5,
+            }}>
+              Location access is required to continue. Please enable location permissions in your browser settings and reload the page.
+            </div>
+          )}
+          {!canAccept && !locationError && (
+            <div style={{
+              fontSize: '0.65rem',
+              color: 'var(--pip-text)',
+              opacity: 0.7,
+              lineHeight: 1.5,
+            }}>
+              Waiting for location...
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleAccept}
+              disabled={!canAccept || submitting}
+              className="pip-btn pip-btn-primary"
+              style={{
+                fontSize: '0.7rem',
+                padding: '6px 18px',
+                opacity: canAccept ? 1 : 0.4,
+                cursor: canAccept ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {submitting ? 'Accepting...' : 'Accept & Continue'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress
+from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
 from ..ws_events import send_task_update, send_user_stats, send_achievements
@@ -183,11 +183,38 @@ class TaskListView(APIView):
 
         # Tutorial tasks: only show if user doesn't already have the reward skill
         # Prefetch skill_execute + reward_skill; batch-fetch in_progress status
-        tutorial_tasks = list(
+
+        # Get IDs of tutorials that are onboarding templates
+        onboarding_template_ids = set(
+            OnboardingTemplate.objects.filter(is_active=True).values_list('tutorial_id', flat=True)
+        )
+
+        # Get user's spawned onboarding tutorials
+        user_onboarding = {
+            uo.tutorial_id: uo
+            for uo in UserOnboardingTutorial.objects.filter(user=user)
+        }
+
+        # Regular tutorials: not onboarding templates
+        # Onboarding tutorials: only if spawned for this user
+        tutorial_tasks_qs = (
             TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
             .select_related('reward_skill')
             .prefetch_related('skill_execute')
         )
+
+        tutorial_tasks = []
+        for t in tutorial_tasks_qs:
+            if t.id in onboarding_template_ids:
+                # Onboarding template — only show if spawned for this user
+                uo = user_onboarding.get(t.id)
+                if uo:
+                    # Override lat/lon with per-user position
+                    t._user_lat = uo.lat
+                    t._user_lon = uo.lon
+                    tutorial_tasks.append(t)
+            else:
+                tutorial_tasks.append(t)
         # Batch lookup: which tutorials does this user have in progress?
         in_progress_ids = set(
             TutorialProgress.objects.filter(
