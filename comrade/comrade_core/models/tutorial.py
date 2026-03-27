@@ -3,13 +3,18 @@ from django.utils.timezone import now
 
 
 class TutorialTask(models.Model):
-    """Standalone tutorial task -- not linked to the regular Task model."""
+    """Standalone tutorial task — not linked to the regular Task model."""
     name = models.CharField(max_length=64)
     description = models.CharField(max_length=200, blank=True)
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
     reward_skill = models.ForeignKey('Skill', on_delete=models.CASCADE, related_name='tutorial_rewards')
     skill_execute = models.ManyToManyField('Skill', blank=True, related_name='tutorial_tasks_execute')
+    owner = models.ForeignKey(
+        'comrade_core.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='owned_tutorials',
+        help_text="If set, tutorial completion requires owner review before skill is awarded",
+    )
 
     def __str__(self):
         return f"Tutorial: {self.name} → {self.reward_skill.name}"
@@ -22,6 +27,7 @@ class TutorialPart(models.Model):
         QUIZ = 'quiz', 'Quiz Page'
         PASSWORD = 'password', 'Password Page'
         FILE_UPLOAD = 'file_upload', 'File Upload Page'
+        FREETEXT = 'freetext', 'Free Text Page'
 
     tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='parts')
     type = models.CharField(max_length=20, choices=Type.choices)
@@ -34,6 +40,10 @@ class TutorialPart(models.Model):
 
     # Password
     password = models.CharField(max_length=200, blank=True, help_text="Correct password for Password page type")
+
+    # Freetext
+    freetext_min_length = models.PositiveIntegerField(default=0, help_text="Minimum characters for Freetext (0 = empty accepted)")
+    freetext_max_length = models.PositiveIntegerField(default=1000, help_text="Maximum characters for Freetext")
 
     class Meta:
         ordering = ['order']
@@ -72,12 +82,21 @@ class TutorialProgress(models.Model):
         IN_PROGRESS = 2, 'In Progress'
         DONE = 5, 'Done'
 
+    class ReviewStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending Review'
+        ACCEPTED = 'accepted', 'Accepted'
+        DECLINED = 'declined', 'Declined'
+
     user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='tutorial_progress')
     tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='progress')
     state = models.IntegerField(choices=State.choices, default=State.IN_PROGRESS)
     completed_parts = models.ManyToManyField(TutorialPart, blank=True)
     datetime_start = models.DateTimeField(default=now)
     datetime_finish = models.DateTimeField(null=True, blank=True)
+    review_status = models.CharField(
+        max_length=10, choices=ReviewStatus.choices, null=True, blank=True, default=None,
+        help_text="Set to 'pending' when tutorial has an owner requiring review",
+    )
 
     class Meta:
         unique_together = ['user', 'tutorial']

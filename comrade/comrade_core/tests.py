@@ -338,6 +338,84 @@ class TutorialTest(TestCase):
         self.assertIn(self.skill, self.user.skills.all())
 
 
+    def test_freetext_part_validates_length(self):
+        """Freetext part enforces min/max length."""
+        part_ft = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='freetext', title='Write', order=2,
+            freetext_min_length=5, freetext_max_length=20,
+        )
+        progress = TutorialProgress.objects.create(user=self.user, tutorial=self.tutorial)
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        # Too short
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'hi'})
+        self.assertEqual(resp.status_code, 400)
+
+        # Too long
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'x' * 21})
+        self.assertEqual(resp.status_code, 400)
+
+        # Just right
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'hello'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_reviewed_tutorial_pending_then_accept(self):
+        """Tutorial with owner enters pending review, owner accepts to award skill."""
+        owner = User.objects.create_user(username='tutor', password='pass')
+        skill = Skill.objects.create(name='Reviewed')
+        tutorial = TutorialTask.objects.create(name='Reviewed Tutorial', reward_skill=skill, owner=owner)
+        part = TutorialPart.objects.create(tutorial=tutorial, type='text', title='Read', order=0)
+
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        # Start tutorial
+        client.post(f'/api/tutorial_task/{tutorial.id}/start')
+
+        # Submit part — should complete but enter pending review
+        resp = client.post(f'/api/tutorial/{tutorial.id}/submit/{part.id}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data.get('pending_review'))
+        self.assertNotIn(skill, self.user.skills.all())
+
+        # Owner accepts
+        owner_token = Token.objects.create(user=owner)
+        owner_client = APIClient()
+        owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/accept_review')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(skill, self.user.skills.all())
+
+    def test_reviewed_tutorial_decline_resets_progress(self):
+        """Tutorial decline resets progress so user can redo."""
+        owner = User.objects.create_user(username='tutor2', password='pass')
+        skill = Skill.objects.create(name='Declined')
+        tutorial = TutorialTask.objects.create(name='Decline Test', reward_skill=skill, owner=owner)
+        part = TutorialPart.objects.create(tutorial=tutorial, type='text', title='Read', order=0)
+
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        client.post(f'/api/tutorial_task/{tutorial.id}/start')
+        client.post(f'/api/tutorial/{tutorial.id}/submit/{part.id}/')
+
+        # Owner declines
+        owner_token = Token.objects.create(user=owner)
+        owner_client = APIClient()
+        owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/decline_review')
+        self.assertEqual(resp.status_code, 200)
+
+        progress = TutorialProgress.objects.get(user=self.user, tutorial=tutorial)
+        self.assertEqual(progress.state, TutorialProgress.State.IN_PROGRESS)
+        self.assertEqual(progress.completed_parts.count(), 0)
+        self.assertNotIn(skill, self.user.skills.all())
+
+
 class TaskAPITest(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(username='owner', password='pass')

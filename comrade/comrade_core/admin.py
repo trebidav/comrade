@@ -162,17 +162,17 @@ class TutorialPartInline(admin.TabularInline):
 
 
 class TutorialTaskAdmin(admin.ModelAdmin):
-    list_display = ['name', 'reward_skill', 'lat', 'lon']
+    list_display = ['name', 'reward_skill', 'owner', 'lat', 'lon']
     search_fields = ['name']
     filter_horizontal = ['skill_execute']
-    fields = ['name', 'description', 'lat', 'lon', 'reward_skill', 'skill_execute']
+    fields = ['name', 'description', 'lat', 'lon', 'reward_skill', 'skill_execute', 'owner']
     inlines = [TutorialPartInline]
 
 
 class TutorialPartAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'type', 'tutorial', 'order']
     list_filter = ['type', 'tutorial']
-    fields = ['tutorial', 'order', 'type', 'title', 'text_content', 'video_url', 'password']
+    fields = ['tutorial', 'order', 'type', 'title', 'text_content', 'video_url', 'password', 'freetext_min_length', 'freetext_max_length']
     inlines = [TutorialQuestionInline]
 
 
@@ -183,7 +183,8 @@ class TutorialQuestionAdmin(admin.ModelAdmin):
 
 
 class TutorialProgressAdmin(admin.ModelAdmin):
-    list_display = ['user', 'tutorial', 'completed_count']
+    list_display = ['user', 'tutorial', 'completed_count', 'review_status']
+    list_filter = ['review_status']
     filter_horizontal = ['completed_parts']
 
     def completed_count(self, obj):

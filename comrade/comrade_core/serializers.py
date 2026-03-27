@@ -153,7 +153,7 @@ class TutorialPartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TutorialPart
-        fields = ['id', 'type', 'title', 'order', 'text_content', 'video_url', 'questions', 'completed']
+        fields = ['id', 'type', 'title', 'order', 'text_content', 'video_url', 'questions', 'completed', 'freetext_min_length', 'freetext_max_length']
         # password intentionally excluded
 
 

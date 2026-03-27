@@ -168,7 +168,7 @@ Tutorials are standalone learning tasks (separate from regular Tasks) that award
 
 ### Models
 
-**TutorialTask** — A tutorial with a name, location, prerequisite skills (`skill_execute`), and a `reward_skill`.
+**TutorialTask** — A tutorial with a name, location, prerequisite skills (`skill_execute`), a `reward_skill`, and an optional `owner` (FK User). If an owner is set, tutorial completion requires the owner to accept/decline a review before the skill is awarded.
 
 **TutorialPart** — A step within a tutorial. Types:
 | Type | Validation |
@@ -178,8 +178,15 @@ Tutorials are standalone learning tasks (separate from regular Tasks) that award
 | `quiz` | All questions must be answered correctly |
 | `password` | Exact string match (case-sensitive) |
 | `file_upload` | File must be provided |
+| `freetext` | Text length must be between `freetext_min_length` (default 0) and `freetext_max_length` (default 1000) |
 
-**TutorialProgress** — Tracks which parts a user has completed. When all parts are done, the `reward_skill` is added to the user.
+**TutorialProgress** — Tracks which parts a user has completed. Has a `review_status` field (`null`, `pending`, `accepted`, `declined`).
+
+### Completion Flow
+
+When all parts are done:
+- **No owner** → skill awarded immediately (current default behavior)
+- **Owner set** → `review_status` set to `pending`. Skill is NOT awarded until owner accepts via `POST /api/tutorial_task/<id>/accept_review`. If declined, progress is reset and user must redo the tutorial.
 
 ### Visibility
 
@@ -432,6 +439,8 @@ All endpoints are prefixed with `/api/`.
 | POST | `/tutorial/<id>/submit/<part_id>/` | Submit a part answer |
 | POST | `/tutorial_task/<id>/start` | Start tutorial |
 | POST | `/tutorial_task/<id>/abandon` | Abandon tutorial |
+| POST | `/tutorial_task/<id>/accept_review` | Accept tutorial review (owner only) |
+| POST | `/tutorial_task/<id>/decline_review` | Decline tutorial review (owner only, resets progress) |
 
 ### Friends
 
