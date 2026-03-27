@@ -79,6 +79,20 @@ class TaskFinishView(APIView):
                 review.photo = photo
             review.save()
 
+            # Auto-accept if task has no owner (no one to review it)
+            if task.owner is None:
+                new_achievements = task.accept_review(request.user)
+                logger.info("Task %d auto-accepted (no owner) by user %d (%s)", task.id, request.user.id, request.user.username)
+                send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
+                task.assignee.refresh_from_db()
+                send_user_stats(task.assignee)
+                send_achievements(task.assignee.id, new_achievements)
+                return Response({
+                    "message": "Task finished and auto-accepted!",
+                    "auto_accepted": True,
+                    "new_achievements": _serialize_achievements(new_achievements),
+                }, status=status.HTTP_200_OK)
+
         logger.info("Task %d finished by user %d (%s)", task.id, request.user.id, request.user.username)
         send_task_update(task, action='finish', exclude_user_id=request.user.id)
         return Response({"message": "Task finished!"}, status=status.HTTP_200_OK)
