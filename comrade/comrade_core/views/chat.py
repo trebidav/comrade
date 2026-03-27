@@ -1,9 +1,21 @@
+import math
+import random
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import ChatMessage, GlobalConfig
+
+
+def _random_point_within(lat, lon, radius_meters):
+    """Generate a random lat/lon within radius_meters of the given point."""
+    # Convert radius to degrees (approximate)
+    radius_deg = radius_meters / 111320.0  # ~111.32 km per degree
+    angle = random.uniform(0, 2 * math.pi)
+    r = radius_deg * math.sqrt(random.uniform(0, 1))  # sqrt for uniform area distribution
+    return lat + r * math.cos(angle), lon + r * math.sin(angle) / math.cos(math.radians(lat))
 
 
 @api_view(['GET'])
@@ -42,7 +54,32 @@ def welcome_message(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def welcome_accept(request):
-    """Mark the welcome message as accepted for this user."""
+    """Accept T&C and spawn onboarding tutorials around user's location."""
+    if request.user.welcome_accepted:
+        return Response({'message': 'Already accepted'}, status=status.HTTP_200_OK)
+
+    lat = request.data.get('latitude')
+    lon = request.data.get('longitude')
+
+    # Spawn onboarding items if location provided
+    if lat is not None and lon is not None:
+        lat, lon = float(lat), float(lon)
+        from comrade_core.models import OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
+        for template in OnboardingTemplate.objects.filter(is_active=True).select_related('tutorial', 'task'):
+            spawn_lat, spawn_lon = _random_point_within(lat, lon, template.spawn_radius_meters)
+            if template.tutorial_id:
+                UserOnboardingTutorial.objects.get_or_create(
+                    user=request.user,
+                    tutorial=template.tutorial,
+                    defaults={'lat': spawn_lat, 'lon': spawn_lon},
+                )
+            elif template.task_id:
+                UserOnboardingTask.objects.get_or_create(
+                    user=request.user,
+                    task=template.task,
+                    defaults={'lat': spawn_lat, 'lon': spawn_lon},
+                )
+
     request.user.welcome_accepted = True
     request.user.save(update_fields=['welcome_accepted'])
     return Response({'message': 'ok'}, status=status.HTTP_200_OK)

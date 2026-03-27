@@ -1,13 +1,35 @@
 import datetime
 
-from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
+from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate
 from rest_framework import serializers
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
-    skills = serializers.StringRelatedField(many=True)
+    skills = serializers.SerializerMethodField()
     level = serializers.IntegerField(read_only=True)
     level_progress = serializers.DictField(read_only=True)
+
+    def get_skills(self, obj):
+        """Return skill names, excluding completed onboarding tutorial reward skills."""
+        # Get onboarding tutorial reward skill IDs
+        onboarding_reward_skill_ids = set(
+            OnboardingTemplate.objects.filter(
+                is_active=True, tutorial__isnull=False,
+            ).values_list('tutorial__reward_skill_id', flat=True)
+        )
+        # Get completed onboarding tutorial IDs for this user
+        completed_tutorial_ids = set(
+            TutorialProgress.objects.filter(
+                user=obj, state=TutorialProgress.State.DONE,
+                tutorial__onboarding_templates__isnull=False,
+            ).values_list('tutorial_id', flat=True)
+        )
+        # Find which onboarding reward skills should be hidden (tutorial completed)
+        hide_skill_ids = set()
+        for tmpl in OnboardingTemplate.objects.filter(is_active=True, tutorial__isnull=False).select_related('tutorial'):
+            if tmpl.tutorial_id in completed_tutorial_ids and tmpl.tutorial.reward_skill_id in onboarding_reward_skill_ids:
+                hide_skill_ids.add(tmpl.tutorial.reward_skill_id)
+        return [s.name for s in obj.skills.all() if s.id not in hide_skill_ids]
 
     class Meta:
         model = User
@@ -27,6 +49,8 @@ class TaskSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     pending_review = serializers.SerializerMethodField()
     is_tutorial = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    lon = serializers.SerializerMethodField()
 
     def get_skill_execute_names(self, obj):
         return [skill.name for skill in obj.skill_execute.all()]
@@ -41,6 +65,12 @@ class TaskSerializer(serializers.ModelSerializer):
         if obj.assignee:
             return f"{obj.assignee.first_name} {obj.assignee.last_name}".strip() or obj.assignee.username
         return None
+
+    def get_lat(self, obj):
+        return getattr(obj, '_user_lat', obj.lat)
+
+    def get_lon(self, obj):
+        return getattr(obj, '_user_lon', obj.lon)
 
     def get_is_tutorial(self, obj):
         return False
@@ -153,7 +183,7 @@ class TutorialPartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TutorialPart
-        fields = ['id', 'type', 'title', 'order', 'text_content', 'video_url', 'questions', 'completed']
+        fields = ['id', 'type', 'title', 'order', 'text_content', 'video_url', 'questions', 'completed', 'freetext_min_length', 'freetext_max_length']
         # password intentionally excluded
 
 
@@ -190,6 +220,8 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     is_tutorial = serializers.SerializerMethodField()
     skill_execute_names = serializers.SerializerMethodField()
     in_progress = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    lon = serializers.SerializerMethodField()
 
     reward_skill_name = serializers.SerializerMethodField()
 
@@ -201,6 +233,12 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
 
     def get_skill_execute_names(self, obj):
         return [s.name for s in obj.skill_execute.all()]
+
+    def get_lat(self, obj):
+        return getattr(obj, '_user_lat', obj.lat)
+
+    def get_lon(self, obj):
+        return getattr(obj, '_user_lon', obj.lon)
 
     def get_in_progress(self, obj):
         in_progress_ids = self.context.get('in_progress_ids')

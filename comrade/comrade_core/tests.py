@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.authtoken.models import Token
 
-from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress
+from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial
 
 
 class TaskTestCase(TestCase):
@@ -336,6 +336,111 @@ class TutorialTest(TestCase):
         if progress.is_complete():
             self.user.skills.add(self.tutorial.reward_skill)
         self.assertIn(self.skill, self.user.skills.all())
+
+
+    def test_freetext_part_validates_length(self):
+        """Freetext part enforces min/max length."""
+        part_ft = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='freetext', title='Write', order=2,
+            freetext_min_length=5, freetext_max_length=20,
+        )
+        progress = TutorialProgress.objects.create(user=self.user, tutorial=self.tutorial)
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        # Too short
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'hi'})
+        self.assertEqual(resp.status_code, 400)
+
+        # Too long
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'x' * 21})
+        self.assertEqual(resp.status_code, 400)
+
+        # Just right
+        resp = client.post(f'/api/tutorial/{self.tutorial.id}/submit/{part_ft.id}/', {'text': 'hello'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_reviewed_tutorial_pending_then_accept(self):
+        """Tutorial with owner enters pending review, owner accepts to award skill."""
+        owner = User.objects.create_user(username='tutor', password='pass')
+        skill = Skill.objects.create(name='Reviewed')
+        tutorial = TutorialTask.objects.create(name='Reviewed Tutorial', reward_skill=skill, owner=owner)
+        part = TutorialPart.objects.create(tutorial=tutorial, type='text', title='Read', order=0)
+
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        # Start tutorial
+        client.post(f'/api/tutorial_task/{tutorial.id}/start')
+
+        # Submit part — should complete but enter pending review
+        resp = client.post(f'/api/tutorial/{tutorial.id}/submit/{part.id}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data.get('pending_review'))
+        self.assertNotIn(skill, self.user.skills.all())
+
+        # Owner accepts
+        owner_token = Token.objects.create(user=owner)
+        owner_client = APIClient()
+        owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/accept_review')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(skill, self.user.skills.all())
+
+    def test_reviewed_tutorial_decline_resets_progress(self):
+        """Tutorial decline resets progress so user can redo."""
+        owner = User.objects.create_user(username='tutor2', password='pass')
+        skill = Skill.objects.create(name='Declined')
+        tutorial = TutorialTask.objects.create(name='Decline Test', reward_skill=skill, owner=owner)
+        part = TutorialPart.objects.create(tutorial=tutorial, type='text', title='Read', order=0)
+
+        token = Token.objects.create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        client.post(f'/api/tutorial_task/{tutorial.id}/start')
+        client.post(f'/api/tutorial/{tutorial.id}/submit/{part.id}/')
+
+        # Owner declines
+        owner_token = Token.objects.create(user=owner)
+        owner_client = APIClient()
+        owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/decline_review')
+        self.assertEqual(resp.status_code, 200)
+
+        progress = TutorialProgress.objects.get(user=self.user, tutorial=tutorial)
+        self.assertEqual(progress.state, TutorialProgress.State.IN_PROGRESS)
+        self.assertEqual(progress.completed_parts.count(), 0)
+        self.assertNotIn(skill, self.user.skills.all())
+
+    def test_welcome_accept_spawns_onboarding_tutorials(self):
+        """Accepting T&C with location spawns onboarding tutorials around user."""
+        user = User.objects.create_user(username='newuser', password='pass')
+        skill = Skill.objects.create(name='Onboard')
+        tutorial = TutorialTask.objects.create(name='Welcome Tutorial', reward_skill=skill)
+        TutorialPart.objects.create(tutorial=tutorial, type='text', title='Intro', order=0)
+        OnboardingTemplate.objects.create(tutorial=tutorial, order=0, spawn_radius_meters=200)
+
+        token = Token.objects.create(user=user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+
+        resp = client.post('/api/welcome/accept/', {'latitude': 50.0, 'longitude': 14.0})
+        self.assertEqual(resp.status_code, 200)
+
+        user.refresh_from_db()
+        self.assertTrue(user.welcome_accepted)
+
+        # Check tutorial was spawned
+        uo = UserOnboardingTutorial.objects.get(user=user, tutorial=tutorial)
+        self.assertIsNotNone(uo.lat)
+        self.assertIsNotNone(uo.lon)
+        # Should be within ~200m of the user
+        from comrade_core.utils import haversine_km
+        dist = haversine_km(50.0, 14.0, uo.lat, uo.lon)
+        self.assertLess(dist, 0.3)  # ~300m tolerance for randomness
 
 
 class TaskAPITest(APITestCase):

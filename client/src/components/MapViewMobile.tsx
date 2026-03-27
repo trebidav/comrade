@@ -15,6 +15,7 @@ import BottomSheet from './BottomSheet'
 import { useLocationSocket } from '../hooks/useLocationSocket'
 import { IconTasks, IconChat, IconPerson, IconCenterOnMe, IconPlus, IconBug } from './Icons'
 import BugReportModal from './BugReportModal'
+import WelcomeModal from './WelcomeModal'
 
 // Fix default marker icons broken by vite bundling
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -443,6 +444,7 @@ export default function MapView({ user, onLogout }: Props) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
+      <WelcomeModal selfLocation={selfLocation} locationError={locationError} onAccepted={fetchTasks} />
       {locationError === 'Location permission denied' && !selfLocation && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2000,

@@ -168,7 +168,7 @@ Tutorials are standalone learning tasks (separate from regular Tasks) that award
 
 ### Models
 
-**TutorialTask** — A tutorial with a name, location, prerequisite skills (`skill_execute`), and a `reward_skill`.
+**TutorialTask** — A tutorial with a name, location, prerequisite skills (`skill_execute`), a `reward_skill`, and an optional `owner` (FK User). If an owner is set, tutorial completion requires the owner to accept/decline a review before the skill is awarded.
 
 **TutorialPart** — A step within a tutorial. Types:
 | Type | Validation |
@@ -178,12 +178,37 @@ Tutorials are standalone learning tasks (separate from regular Tasks) that award
 | `quiz` | All questions must be answered correctly |
 | `password` | Exact string match (case-sensitive) |
 | `file_upload` | File must be provided |
+| `freetext` | Text length must be between `freetext_min_length` (default 0) and `freetext_max_length` (default 1000) |
 
-**TutorialProgress** — Tracks which parts a user has completed. When all parts are done, the `reward_skill` is added to the user.
+**TutorialProgress** — Tracks which parts a user has completed. Has a `review_status` field (`null`, `pending`, `accepted`, `declined`).
+
+### Completion Flow
+
+When all parts are done:
+- **No owner** → skill awarded immediately (current default behavior)
+- **Owner set** → `review_status` set to `pending`. Skill is NOT awarded until owner accepts via `POST /api/tutorial_task/<id>/accept_review`. If declined, progress is reset and user must redo the tutorial.
+
+### Onboarding Spawn System
+
+**OnboardingTemplate** — Admin-configured list of tutorials to spawn when a new user accepts T&C:
+- `tutorial` FK TutorialTask — the template
+- `order` — spawn order
+- `spawn_radius_meters` (default 100) — max distance from user
+- `is_active` — whether to include in onboarding
+
+**UserOnboardingTutorial** — Per-user spawned instance with personalized location:
+- `user`, `tutorial` (unique together)
+- `lat`, `lon` — random position near user at time of T&C acceptance
+
+On `POST /api/welcome/accept/` with `{latitude, longitude}`:
+1. For each active `OnboardingTemplate`, create a `UserOnboardingTutorial` at a random position within `spawn_radius_meters`
+2. Set `welcome_accepted = True`
+
+Onboarding tutorials only appear in the task list if the user has a `UserOnboardingTutorial` row. The per-user lat/lon is used for map display and proximity checks instead of the template's coordinates.
 
 ### Visibility
 
-Tutorial tasks only appear in the task list for users who do NOT already have the `reward_skill`. Tutorial IDs are offset by 100,000 in the API to avoid collision with regular Task IDs.
+Tutorial tasks only appear in the task list for users who do NOT already have the `reward_skill`. Tutorial IDs are offset by 100,000 in the API to avoid collision with regular Task IDs. Onboarding template tutorials are excluded unless spawned for the user.
 
 ---
 
@@ -402,6 +427,12 @@ Authorization: Token <key>
 
 Session authentication is disabled to avoid CSRF issues with cross-origin requests.
 
+### T&C Welcome Gate
+
+After first login, a full-screen Terms & Conditions modal blocks the app until the user accepts. The Accept button is disabled until the browser's location service is enabled (required for spawning onboarding tutorials around the user). If location is denied, platform-specific instructions are shown.
+
+On accept, the frontend sends the user's GPS coordinates. The backend spawns onboarding tutorial tasks at random positions around the user and sets `welcome_accepted = True`.
+
 ---
 
 ## API Reference
@@ -432,6 +463,8 @@ All endpoints are prefixed with `/api/`.
 | POST | `/tutorial/<id>/submit/<part_id>/` | Submit a part answer |
 | POST | `/tutorial_task/<id>/start` | Start tutorial |
 | POST | `/tutorial_task/<id>/abandon` | Abandon tutorial |
+| POST | `/tutorial_task/<id>/accept_review` | Accept tutorial review (owner only) |
+| POST | `/tutorial_task/<id>/decline_review` | Decline tutorial review (owner only, resets progress) |
 
 ### Friends
 

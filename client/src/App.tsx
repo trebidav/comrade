@@ -3,7 +3,6 @@ import Login from './components/Login'
 import MapViewMobile from './components/MapViewMobile'
 import MapViewDesktop from './components/MapViewDesktop'
 import api, { type User } from './api'
-import WelcomeModal from './components/WelcomeModal'
 import { useLayoutMode } from './hooks/useLayoutMode'
 import { getLayoutMode } from './theme'
 import './index.css'
@@ -124,7 +123,6 @@ export default function App() {
 
   return (
     <>
-      <WelcomeModal />
       {mode === 'desktop'
         ? <MapViewDesktop user={user} onLogout={handleLogout} />
         : <MapViewMobile user={user} onLogout={handleLogout} />
