@@ -193,12 +193,38 @@ class TaskListView(APIView):
             OnboardingTemplate.objects.filter(is_active=True, task__isnull=False).values_list('task_id', flat=True)
         )
 
-        # Get user's spawned onboarding tasks (per-user lat/lon)
+        # Get user's spawned onboarding items
+        user_onboarding_tutorials = {
+            uo.tutorial_id: uo
+            for uo in UserOnboardingTutorial.objects.filter(user=user)
+        }
         user_onboarding_tasks = {
             uo.task_id: uo
             for uo in UserOnboardingTask.objects.filter(user=user)
         }
 
+        # Determine if user is still in onboarding (has unfinished onboarding items)
+        onboarding_in_progress = False
+        if user_onboarding_tutorials or user_onboarding_tasks:
+            # Check tutorials: any spawned onboarding tutorial not yet DONE?
+            completed_tutorial_ids = set(
+                TutorialProgress.objects.filter(
+                    user=user, state=TutorialProgress.State.DONE,
+                    tutorial_id__in=user_onboarding_tutorials.keys(),
+                ).values_list('tutorial_id', flat=True)
+            )
+            # Check tasks: any spawned onboarding task not yet DONE?
+            completed_task_ids = set(
+                Task.objects.filter(
+                    id__in=user_onboarding_tasks.keys(), state=Task.State.DONE,
+                ).values_list('id', flat=True)
+            )
+            onboarding_in_progress = (
+                set(user_onboarding_tutorials.keys()) - completed_tutorial_ids != set()
+                or set(user_onboarding_tasks.keys()) - completed_task_ids != set()
+            )
+
+        # ── Regular tasks ──
         tasks_qs = Task.objects.filter(
             models.Q(owner=user)
             | models.Q(assignee=user)
@@ -207,7 +233,6 @@ class TaskListView(APIView):
             | models.Q(skill_read__in=user.skills.all())
         ).distinct().select_related('owner', 'assignee').prefetch_related('skill_execute', 'skill_read', 'skill_write', 'reviews')
 
-        # Filter onboarding-template tasks: only show if spawned for this user, override lat/lon
         tasks = []
         for t in tasks_qs:
             if t.id in onboarding_task_ids:
@@ -216,21 +241,15 @@ class TaskListView(APIView):
                     t._user_lat = uo.lat
                     t._user_lon = uo.lon
                     tasks.append(t)
+            elif onboarding_in_progress:
+                # During onboarding, hide non-onboarding tasks
+                pass
             else:
                 tasks.append(t)
 
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
-        # Tutorial tasks: only show if user doesn't already have the reward skill
-
-        # Get user's spawned onboarding tutorials
-        user_onboarding = {
-            uo.tutorial_id: uo
-            for uo in UserOnboardingTutorial.objects.filter(user=user)
-        }
-
-        # Regular tutorials: not onboarding templates
-        # Onboarding tutorials: only if spawned for this user
+        # ── Tutorial tasks ──
         tutorial_tasks_qs = (
             TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
             .select_related('reward_skill')
@@ -240,13 +259,14 @@ class TaskListView(APIView):
         tutorial_tasks = []
         for t in tutorial_tasks_qs:
             if t.id in onboarding_tutorial_ids:
-                # Onboarding template — only show if spawned for this user
-                uo = user_onboarding.get(t.id)
+                uo = user_onboarding_tutorials.get(t.id)
                 if uo:
-                    # Override lat/lon with per-user position
                     t._user_lat = uo.lat
                     t._user_lon = uo.lon
                     tutorial_tasks.append(t)
+            elif onboarding_in_progress:
+                # During onboarding, hide non-onboarding tutorials
+                pass
             else:
                 tutorial_tasks.append(t)
         # Batch lookup: which tutorials does this user have in progress?
