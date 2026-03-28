@@ -185,11 +185,17 @@ class TutorialTaskAbandonView(APIView):
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        deleted, _ = TutorialProgress.objects.filter(
+        progress = TutorialProgress.objects.filter(
             user=request.user, tutorial=tutorial, state=TutorialProgress.State.IN_PROGRESS
-        ).delete()
-        if not deleted:
+        ).first()
+        if not progress:
             return Response({"error": "Tutorial not in progress"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Clean up submissions and orphaned reviews before deleting progress
+        TutorialPartSubmission.objects.filter(progress=progress).delete()
+        TutorialReview.objects.filter(tutorial=tutorial, user=request.user, status=TutorialReview.Status.PENDING).delete()
+        progress.delete()
+        send_tasks_changed()
 
         return Response({"message": "Tutorial abandoned."}, status=status.HTTP_200_OK)
 
