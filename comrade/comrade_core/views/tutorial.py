@@ -117,6 +117,7 @@ class TutorialSubmitPartView(APIView):
                 progress.review_status = TutorialProgress.ReviewStatus.PENDING
                 progress.save()
                 TutorialReview.objects.get_or_create(tutorial=tutorial, user=request.user, status=TutorialReview.Status.PENDING)
+                send_tasks_changed()
                 logger.info("Tutorial %d completed by user %d (%s) — pending review by owner %d", tutorial.id, request.user.id, request.user.username, tutorial.owner_id)
                 return Response({
                     "completed": True,
