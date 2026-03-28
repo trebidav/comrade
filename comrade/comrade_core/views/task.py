@@ -129,6 +129,9 @@ class TaskRateView(APIView):
         )
         new_achievements = request.user.check_and_award_achievements()
         send_achievements(request.user.id, new_achievements)
+        if new_achievements:
+            send_user_stats(request.user)
+            send_tasks_changed()
         return Response({"message": "Rating saved!", "new_achievements": _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
 
 class TaskPauseView(APIView):

@@ -12,7 +12,7 @@ from ..models import User
 
 logger = logging.getLogger(__name__)
 from ..serializers import UserDetailSerializer
-from ..ws_events import send_friend_event, send_achievements
+from ..ws_events import send_friend_event, send_achievements, send_user_stats, send_tasks_changed
 from .task import _serialize_achievements
 
 
@@ -83,6 +83,9 @@ def accept_friend_request(request, user_id):
 
         new_achievements = request.user.check_and_award_achievements()
         send_achievements(request.user.id, new_achievements)
+        if new_achievements:
+            send_user_stats(request.user)
+            send_tasks_changed()
         return Response({'message': 'Friend request accepted', 'new_achievements': _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
