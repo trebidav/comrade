@@ -393,6 +393,16 @@ All gamification and proximity parameters are controlled from Django admin.
 
 Configuration is cached for 60 seconds to reduce DB queries.
 
+### Staff Permissions
+
+Staff users (`is_staff=True`, `is_superuser=False`) have restricted admin access:
+- **Can see:** Tasks, Tutorial Tasks, Tutorial Parts, Tutorial Questions (only their own)
+- **Can create:** Tasks and Tutorial Tasks (auto-assigned as owner)
+- **Cannot see:** Users, Skills, GlobalConfig, Achievements, Ratings, Reviews, Chat, Bug Reports, Onboarding Templates
+- **On the map:** Can create Tasks and Tutorial Tasks via the creation modal (same as superuser)
+
+Superusers see everything.
+
 ### Admin Panels
 
 All models are registered with comprehensive list displays, filters, search, and inline editing where appropriate:
@@ -463,6 +473,7 @@ All endpoints are prefixed with `/api/`.
 | POST | `/tutorial/<id>/submit/<part_id>/` | Submit a part answer |
 | POST | `/tutorial_task/<id>/start` | Start tutorial |
 | POST | `/tutorial_task/<id>/abandon` | Abandon tutorial |
+| POST | `/tutorials/create` | Create tutorial with parts (admin/staff) |
 | POST | `/tutorial_task/<id>/accept_review` | Accept tutorial review (owner only) |
 | POST | `/tutorial_task/<id>/decline_review` | Decline tutorial review (owner only, resets progress) |
 
@@ -521,7 +532,7 @@ All endpoints are prefixed with `/api/`.
 ### Task UI
 - **TasksSidebar / TasksSidebarDesktop** — Filterable task list with distance, criticality, and skill matching
 - **ActiveTaskPanel / ActiveTaskPanelDesktop** — Current task with timer, pause/resume/finish actions
-- **CreateTaskModal / CreateTaskModalDesktop** — Admin task creation form with skill selection
+- **CreateTaskModal / CreateTaskModalDesktop** — Admin/staff creation form with two tabs: Task (regular task) and Tutorial (with inline part creation including quiz/password/freetext)
 - **TutorialPanel / TutorialPanelDesktop** — Step-through tutorial UI with quiz/password/file upload handling
 
 ### User & Social

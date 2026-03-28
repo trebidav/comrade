@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import GlobalConfig, TutorialTask, TutorialPart, TutorialAnswer, TutorialProgress, UserOnboardingTutorial
+from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
 from ..ws_events import send_user_stats, send_achievements
@@ -240,3 +240,75 @@ class TutorialDeclineReviewView(APIView):
 
         logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, progress.user.id, request.user.id)
         return Response({"message": "Tutorial review declined, progress reset."}, status=status.HTTP_200_OK)
+
+
+class TutorialCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if not (user.is_superuser or user.is_staff):
+            return Response({"error": "Only admins can create tutorials"}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data
+        name = data.get('name', '').strip()
+        if not name:
+            return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        reward_skill_id = data.get('reward_skill')
+        if not reward_skill_id:
+            return Response({"error": "Reward skill is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            reward_skill = Skill.objects.get(pk=reward_skill_id)
+        except Skill.DoesNotExist:
+            return Response({"error": "Skill not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        tutorial = TutorialTask.objects.create(
+            name=name,
+            description=data.get('description', ''),
+            lat=data.get('lat'),
+            lon=data.get('lon'),
+            reward_skill=reward_skill,
+            owner=user,
+        )
+
+        # Set prerequisite skills
+        skill_execute_ids = data.get('skill_execute', [])
+        if skill_execute_ids:
+            tutorial.skill_execute.set(Skill.objects.filter(id__in=skill_execute_ids))
+
+        # Create parts
+        parts = data.get('parts', [])
+        for i, part_data in enumerate(parts):
+            part_type = part_data.get('type', 'text')
+            part = TutorialPart.objects.create(
+                tutorial=tutorial,
+                type=part_type,
+                title=part_data.get('title', ''),
+                order=i,
+                text_content=part_data.get('text_content', ''),
+                video_url=part_data.get('video_url', ''),
+                password=part_data.get('password', ''),
+                freetext_min_length=part_data.get('freetext_min_length', 0),
+                freetext_max_length=part_data.get('freetext_max_length', 1000),
+            )
+
+            # Create questions for quiz parts
+            if part_type == 'quiz':
+                for j, q_data in enumerate(part_data.get('questions', [])):
+                    question = TutorialQuestion.objects.create(
+                        part=part,
+                        text=q_data.get('text', ''),
+                        order=j,
+                    )
+                    for k, a_data in enumerate(q_data.get('answers', [])):
+                        TutorialAnswer.objects.create(
+                            question=question,
+                            text=a_data.get('text', ''),
+                            is_correct=a_data.get('is_correct', False),
+                            order=k,
+                        )
+
+        logger.info("Tutorial %d created by user %d (%s)", tutorial.id, user.id, user.username)
+        return Response({"message": "Tutorial created", "id": tutorial.id}, status=status.HTTP_201_CREATED)

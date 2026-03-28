@@ -584,6 +584,84 @@ class FriendsAPITest(APITestCase):
         self.assertEqual(resp.status_code, 200)
 
 
+class TutorialCreateAPITest(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username='admin', password='pass', is_staff=True)
+        self.user = User.objects.create_user(username='user', password='pass')
+        self.skill = Skill.objects.create(name='RewardSkill')
+        self.admin_token = Token.objects.create(user=self.admin)
+        self.user_token = Token.objects.create(user=self.user)
+
+    def test_create_tutorial_requires_staff(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + self.user_token.key)
+        resp = client.post('/api/tutorials/create', {
+            'name': 'Test Tutorial',
+            'reward_skill': self.skill.id,
+        }, format='json')
+        self.assertEqual(resp.status_code, 403)
+
+    def test_create_tutorial_as_staff(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + self.admin_token.key)
+        resp = client.post('/api/tutorials/create', {
+            'name': 'New Tutorial',
+            'reward_skill': self.skill.id,
+            'description': 'A test tutorial',
+            'lat': 50.0,
+            'lon': 14.0,
+            'parts': [
+                {'type': 'text', 'title': 'Intro', 'text_content': 'Welcome'},
+                {
+                    'type': 'quiz', 'title': 'Quiz',
+                    'questions': [
+                        {
+                            'text': 'What is 1+1?',
+                            'answers': [
+                                {'text': '2', 'is_correct': True},
+                                {'text': '3', 'is_correct': False},
+                            ]
+                        }
+                    ]
+                },
+            ]
+        }, format='json')
+        self.assertEqual(resp.status_code, 201)
+        tutorial_id = resp.data['id']
+        tutorial = TutorialTask.objects.get(pk=tutorial_id)
+        self.assertEqual(tutorial.name, 'New Tutorial')
+        self.assertEqual(tutorial.owner, self.admin)
+        self.assertEqual(tutorial.parts.count(), 2)
+        quiz_part = tutorial.parts.get(type='quiz')
+        self.assertEqual(quiz_part.questions.count(), 1)
+        self.assertEqual(quiz_part.questions.first().answers.count(), 2)
+
+    def test_create_tutorial_missing_name(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + self.admin_token.key)
+        resp = client.post('/api/tutorials/create', {
+            'reward_skill': self.skill.id,
+        }, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_create_tutorial_missing_reward_skill(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + self.admin_token.key)
+        resp = client.post('/api/tutorials/create', {
+            'name': 'Test',
+        }, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_create_tutorial_invalid_skill(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + self.admin_token.key)
+        resp = client.post('/api/tutorials/create', {
+            'name': 'Test',
+            'reward_skill': 99999,
+        }, format='json')
+        self.assertEqual(resp.status_code, 404)
+
+
 class GlobalConfigAPITest(APITestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(username='admin', password='pass')

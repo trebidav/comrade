@@ -29,6 +29,7 @@ urlpatterns = [
     path('tutorial_task/<int:task_id>/abandon', views.TutorialTaskAbandonView.as_view(), name='abandon_tutorial_task'),
     path('tutorial_task/<int:task_id>/accept_review', views.TutorialAcceptReviewView.as_view(), name='accept_tutorial_review'),
     path('tutorial_task/<int:task_id>/decline_review', views.TutorialDeclineReviewView.as_view(), name='decline_tutorial_review'),
+    path('tutorials/create', views.TutorialCreateView.as_view(), name='create_tutorial'),
     path('friends/send/<int:user_id>/', views.send_friend_request, name='send_friend_request'),
     path('friends/accept/<int:user_id>/', views.accept_friend_request, name='accept_friend_request'),
     path('friends/reject/<int:user_id>/', views.reject_friend_request, name='reject_friend_request'),
