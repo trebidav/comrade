@@ -351,7 +351,7 @@ class TutorialCreateView(APIView):
             lat=data.get('lat'),
             lon=data.get('lon'),
             reward_skill=reward_skill,
-            owner=user,
+            owner=user if data.get('require_review', True) else None,
         )
 
         # Set prerequisite skills
