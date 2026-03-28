@@ -226,6 +226,34 @@ class TaskLifecycleTest(TestCase):
         self.assertIsNone(self.task.assignee)
 
 
+    def test_ownerless_task_auto_accepts_on_finish(self):
+        """Ownerless tasks should auto-accept: finish → IN_REVIEW → DONE in one step."""
+        task = Task.objects.create(name='ownerless', owner=None, state=Task.State.OPEN, coins=0.5, xp=0.5, minutes=15)
+        task.start(self.worker)
+        task.finish(self.worker)
+        # Simulate auto-accept (as the view does)
+        Review.objects.create(task=task)
+        new_achievements = task.accept_review(self.worker)
+        task.refresh_from_db()
+        self.assertEqual(task.state, Task.State.DONE)
+        self.worker.refresh_from_db()
+        self.assertGreater(self.worker.coins, 0)
+
+    def test_finish_ownerless_via_api(self):
+        """API call to finish an ownerless task should return auto_accepted=True."""
+        task = Task.objects.create(name='ownerless-api', owner=None, state=Task.State.OPEN)
+        task.start(self.worker)
+        task.save()
+        token = Token.objects.create(user=self.worker)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+        resp = client.post(f'/api/task/{task.id}/finish')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data.get('auto_accepted'))
+        task.refresh_from_db()
+        self.assertEqual(task.state, Task.State.DONE)
+
+
 class UserModelTest(TestCase):
     def test_level_starts_at_zero(self):
         u = User.objects.create_user(username='new', password='pass')
