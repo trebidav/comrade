@@ -1,6 +1,6 @@
 import datetime
 
-from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate
+from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialPartSubmission, OnboardingTemplate
 from rest_framework import serializers
 
 
@@ -302,3 +302,21 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     class Meta:
         model = TutorialTask
         fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner', 'owner_pending_review_count']
+
+
+class TutorialPartSubmissionSerializer(serializers.ModelSerializer):
+    part_title = serializers.CharField(source='part.title', read_only=True)
+    part_type = serializers.CharField(source='part.type', read_only=True)
+    submitted_file_url = serializers.SerializerMethodField()
+
+    def get_submitted_file_url(self, obj):
+        if not obj.submitted_file:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.submitted_file.url)
+        return obj.submitted_file.url
+
+    class Meta:
+        model = TutorialPartSubmission
+        fields = ['part_id', 'part_title', 'part_type', 'submitted_text', 'submitted_file_url']

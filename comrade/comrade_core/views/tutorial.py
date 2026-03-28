@@ -267,6 +267,42 @@ class TutorialDeclineReviewView(APIView):
         return Response({"message": "Tutorial review declined, progress reset."}, status=status.HTTP_200_OK)
 
 
+class TutorialPendingReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        try:
+            tutorial = TutorialTask.objects.get(pk=task_id)
+        except TutorialTask.DoesNotExist:
+            return Response({"error": "Tutorial not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if tutorial.owner != request.user:
+            return Response({"error": "Only the owner can view reviews"}, status=status.HTTP_403_FORBIDDEN)
+
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+
+        if not review:
+            return Response({"error": "No pending reviews"}, status=status.HTTP_404_NOT_FOUND)
+
+        progress = TutorialProgress.objects.get(user=review.user, tutorial=tutorial)
+        submissions = TutorialPartSubmission.objects.filter(
+            progress=progress, part__type__in=['freetext', 'file_upload'],
+        ).select_related('part').order_by('part__order')
+
+        from ..serializers import TutorialPartSubmissionSerializer
+        return Response({
+            "user": {
+                "id": review.user.id,
+                "username": review.user.username,
+                "profile_picture": review.user.profile_picture if hasattr(review.user, 'profile_picture') else None,
+            },
+            "submissions": TutorialPartSubmissionSerializer(submissions, many=True, context={'request': request}).data,
+            "created_at": review.created_at.isoformat(),
+        })
+
+
 class TutorialCreateView(APIView):
     permission_classes = [IsAuthenticated]
 

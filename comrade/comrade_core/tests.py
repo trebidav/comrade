@@ -726,3 +726,51 @@ class TutorialSubmissionPersistenceTest(APITestCase):
         sub = TutorialPartSubmission.objects.get(progress__user=self.user, part=file_part)
         self.assertIsNotNone(sub.submitted_file.name)
         self.assertIn('cert', sub.submitted_file.name)
+
+
+class TutorialPendingReviewTest(APITestCase):
+    """Test the pending review endpoint for tutorial owners."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username='review_owner', password='pass')
+        self.user1 = User.objects.create_user(username='review_user1', password='pass')
+        self.user2 = User.objects.create_user(username='review_user2', password='pass')
+        self.skill = Skill.objects.create(name='TestSkill')
+        self.tutorial = TutorialTask.objects.create(name='Review Tutorial', reward_skill=self.skill, owner=self.owner)
+        self.part = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='freetext', title='Essay', order=0,
+            freetext_min_length=5, freetext_max_length=500,
+        )
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.owner_token.key)
+
+    def _complete_tutorial(self, user):
+        """Helper: start tutorial, submit freetext, creating a pending review."""
+        token = Token.objects.create(user=user)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+        c.post(f'/api/tutorial_task/{self.tutorial.id}/start', {'latitude': 0, 'longitude': 0})
+        c.post(f'/api/tutorial/{self.tutorial.id}/submit/{self.part.id}/', {'text': f'Answer from {user.username}'})
+
+    def test_returns_oldest_pending_review(self):
+        self._complete_tutorial(self.user1)
+        self._complete_tutorial(self.user2)
+        resp = self.client.get(f'/api/tutorial_task/{self.tutorial.id}/pending_review')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['user']['username'], 'review_user1')
+        self.assertEqual(len(resp.data['submissions']), 1)
+        self.assertEqual(resp.data['submissions'][0]['part_type'], 'freetext')
+        self.assertIn('Answer from review_user1', resp.data['submissions'][0]['submitted_text'])
+
+    def test_returns_404_when_no_pending_reviews(self):
+        resp = self.client.get(f'/api/tutorial_task/{self.tutorial.id}/pending_review')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_non_owner_gets_403(self):
+        self._complete_tutorial(self.user1)
+        user_token = Token.objects.get(user=self.user1)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION='Token ' + user_token.key)
+        resp = c.get(f'/api/tutorial_task/{self.tutorial.id}/pending_review')
+        self.assertEqual(resp.status_code, 403)
