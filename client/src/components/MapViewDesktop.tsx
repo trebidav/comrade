@@ -969,7 +969,7 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
         )}
 
         {/* Regular task actions */}
-        {!task.is_tutorial && task.state === 1 && canStart && inProximity && (
+        {!task.is_tutorial && task.state === 1 && !isOwner && canStart && inProximity && (
           <button className="pip-popup-btn pip-popup-btn-primary" onClick={() => onAction('start', task.id)}>
             Start
           </button>
