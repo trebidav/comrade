@@ -90,6 +90,8 @@ class TaskFinishView(APIView):
             if task.owner is None:
                 new_achievements = task.accept_review(request.user)
                 logger.info("Task %d auto-accepted (no owner) by user %d (%s)", task.id, request.user.id, request.user.username)
+                # Mark onboarding task as completed (persists through respawn)
+                UserOnboardingTask.objects.filter(user=request.user, task=task).update(completed=True)
                 send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
                 task.assignee.refresh_from_db()
                 send_user_stats(task.assignee)
@@ -217,22 +219,23 @@ class TaskListView(APIView):
             for uo in UserOnboardingTask.objects.filter(user=user)
         }
 
-        # Determine if user is still in onboarding (has unfinished onboarding items)
+        # Determine if user is still in onboarding
+        # Check tutorials (via TutorialProgress DONE) and tasks (via UserOnboardingTask.completed flag)
+        # The completed flag persists through task respawn, avoiding the re-trigger bug.
         onboarding_in_progress = False
         if user_onboarding_tutorials or user_onboarding_tasks:
-            # Check tutorials: any spawned onboarding tutorial not yet DONE?
             completed_tutorial_ids = set(
                 TutorialProgress.objects.filter(
                     user=user, state=TutorialProgress.State.DONE,
                     tutorial_id__in=user_onboarding_tutorials.keys(),
                 ).values_list('tutorial_id', flat=True)
-            )
-            # Check tasks: any spawned onboarding task not yet DONE?
+            ) if user_onboarding_tutorials else set()
             completed_task_ids = set(
-                Task.objects.filter(
-                    id__in=user_onboarding_tasks.keys(), state=Task.State.DONE,
-                ).values_list('id', flat=True)
-            )
+                UserOnboardingTask.objects.filter(
+                    user=user, completed=True,
+                    task_id__in=user_onboarding_tasks.keys(),
+                ).values_list('task_id', flat=True)
+            ) if user_onboarding_tasks else set()
             onboarding_in_progress = (
                 set(user_onboarding_tutorials.keys()) - completed_tutorial_ids != set()
                 or set(user_onboarding_tasks.keys()) - completed_task_ids != set()
@@ -335,6 +338,9 @@ class TaskAcceptReviewView(APIView):
             earned_xp = task.xp if task.xp is not None else 0
 
         logger.info("Task %d review accepted by user %d (%s)", task.id, request.user.id, request.user.username)
+        # Mark onboarding task as completed if applicable
+        if task.assignee:
+            UserOnboardingTask.objects.filter(user=task.assignee, task=task).update(completed=True)
         send_task_update(task, action='accept_review', exclude_user_id=request.user.id)
         # Push stats and achievements to the ASSIGNEE (not the owner who called this)
         if task.assignee:

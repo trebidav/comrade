@@ -156,6 +156,7 @@ class UserOnboardingTask(models.Model):
     task = models.ForeignKey('comrade_core.Task', on_delete=models.CASCADE, related_name='user_onboarding')
     lat = models.FloatField()
     lon = models.FloatField()
+    completed = models.BooleanField(default=False, help_text="Set to True when user finishes this task (persists through respawn)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
