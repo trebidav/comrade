@@ -222,6 +222,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
   const [showBugReport, setShowBugReport] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
+  const [reviewTask, setReviewTask] = useState<Task | null>(null)
 
   // Apply persisted theme on mount and listen for changes
   useEffect(() => {
@@ -359,6 +360,10 @@ export default function MapView({ user, onLogout }: Props) {
       setTimeout(() => {
         markerRefs.current.get(task.id)?.openPopup()
       }, 300)
+    }
+    // Owner review mode: open review panel on explicit click
+    if (task.is_tutorial && (task.owner_pending_review_count ?? 0) > 0) {
+      setReviewTask(task)
     }
   }
 
@@ -587,7 +592,7 @@ export default function MapView({ user, onLogout }: Props) {
 
           {/* Active task panel - bottom center */}
           {(() => {
-            const activeTask = tasks.find((t) => t.is_tutorial ? (t.in_progress || (t.owner_pending_review_count ?? 0) > 0) : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
+            const activeTask = tasks.find((t) => t.is_tutorial ? t.in_progress : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
             if (!activeTask) return null
             if (activeTask.is_tutorial) return (
               <TutorialPanel
@@ -611,6 +616,16 @@ export default function MapView({ user, onLogout }: Props) {
               />
             )
           })()}
+
+          {/* Owner review panel (opened from OWNED tab or map click, dismissible) */}
+          {reviewTask && (
+            <TutorialPanel
+              task={reviewTask}
+              onCompleted={() => { setReviewTask(null); fetchTasks() }}
+              onLocate={handleTaskClick}
+              onAction={handleTaskAction}
+            />
+          )}
 
           {/* Rating modal - shown after finishing a task */}
           {ratingTarget && (

@@ -253,6 +253,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [activeSheet, setActiveSheet] = useState<MainSheet>(null)
   const [showBugReport, setShowBugReport] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [reviewTask, setReviewTask] = useState<Task | null>(null)
   const [animatingTab, setAnimatingTab] = useState<MainSheet | 'map' | null>(null)
   const [chatUnread, setChatUnread] = useState(0)
   const activeSheetRef = useRef<MainSheet>(null)
@@ -395,8 +396,15 @@ export default function MapView({ user, onLogout }: Props) {
     if (task.lat != null && task.lon != null) {
       window.dispatchEvent(new CustomEvent('pip-pan-to', { detail: { lat: task.lat, lon: task.lon } }))
     }
-    // In-progress tutorials or owner review mode: show the tutorial panel instead of opening detail sheet
-    if (task.is_tutorial && (task.in_progress || (task.owner_pending_review_count ?? 0) > 0)) {
+    // In-progress tutorials: show the tutorial panel instead of opening detail sheet
+    if (task.is_tutorial && task.in_progress) {
+      setSelectedTask(null)
+      setActiveSheet(null)
+      return
+    }
+    // Owner review mode: open review panel on explicit click
+    if (task.is_tutorial && (task.owner_pending_review_count ?? 0) > 0) {
+      setReviewTask(task)
       setSelectedTask(null)
       setActiveSheet(null)
       return
@@ -433,7 +441,7 @@ export default function MapView({ user, onLogout }: Props) {
   const centerLat = selfLocation?.lat ?? user.latitude ?? 50.0755
   const centerLon = selfLocation?.lon ?? user.longitude ?? 14.4378
 
-  const activeTask = tasks.find((t) => t.is_tutorial ? (t.in_progress || (t.owner_pending_review_count ?? 0) > 0) : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
+  const activeTask = tasks.find((t) => t.is_tutorial ? t.in_progress : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
   const activeTaskCount = tasks.filter((t) => t.is_tutorial ? t.in_progress : (t.state === 2 || t.state === 3) && t.assignee === currentUser.id).length
 
   // Calculate FAB bottom offset (above active task bar if shown)
@@ -698,6 +706,16 @@ export default function MapView({ user, onLogout }: Props) {
             onLocate={handleTaskClick}
           />
         )
+      )}
+
+      {/* Owner review panel (opened from OWNED tab or map click, dismissible) */}
+      {reviewTask && (
+        <TutorialPanel
+          task={reviewTask}
+          onCompleted={() => { setReviewTask(null); fetchTasks() }}
+          onLocate={handleTaskClick}
+          onAction={handleTaskAction}
+        />
       )}
 
       {/* Bottom Navigation — Tasks + Chat only */}
