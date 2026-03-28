@@ -27,6 +27,7 @@ export interface Task {
   reward_skill_name?: string | null
   tutorial_pending_review?: boolean
   has_owner?: boolean
+  owner_pending_review_count?: number
   // Regular task fields
   state?: number
   criticality?: number
@@ -74,19 +75,50 @@ export interface TutorialQuestion {
 
 export interface TutorialPart {
   id: number
-  type: 'text' | 'video' | 'quiz' | 'password' | 'file_upload'
+  type: 'text' | 'video' | 'quiz' | 'password' | 'file_upload' | 'freetext'
   title: string
   order: number
   text_content: string
   video_url: string
   questions: TutorialQuestion[]
   completed: boolean
+  freetext_min_length?: number
+  freetext_max_length?: number
 }
 
 export interface TutorialData {
   id: number
   reward_skill_name: string
   parts: TutorialPart[]
+}
+
+export interface TutorialReviewData {
+  user: { id: number; username: string; profile_picture: string | null }
+  submissions: Array<{
+    part_id: number
+    part_title: string
+    part_type: 'freetext' | 'file_upload'
+    submitted_text: string | null
+    submitted_file_url: string | null
+  }>
+  created_at: string
+}
+
+export async function fetchPendingReview(tutorialId: number): Promise<TutorialReviewData | null> {
+  try {
+    const resp = await api.get<TutorialReviewData>(`/tutorial_task/${tutorialId}/pending_review`)
+    return resp.data
+  } catch {
+    return null
+  }
+}
+
+export async function acceptTutorialReview(tutorialId: number, userId: number) {
+  return api.post(`/tutorial_task/${tutorialId}/accept_review`, { user_id: userId })
+}
+
+export async function declineTutorialReview(tutorialId: number, userId: number, reason: string) {
+  return api.post(`/tutorial_task/${tutorialId}/decline_review`, { user_id: userId, reason })
 }
 
 export interface User {
