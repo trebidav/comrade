@@ -302,3 +302,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
     async def friend_online(self, event):
         await self.send(text_data=json.dumps(event))
+
+    async def tutorial_review_accepted(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def tutorial_review_declined(self, event):
+        await self.send(text_data=json.dumps(event))

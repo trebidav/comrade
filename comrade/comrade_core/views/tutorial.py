@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, TutorialPartSubmission, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
-from ..ws_events import send_user_stats, send_achievements
+from ..ws_events import send_user_stats, send_achievements, send_tutorial_review_accepted, send_tutorial_review_declined
 from .task import _serialize_achievements
 
 logger = logging.getLogger(__name__)
@@ -223,6 +223,7 @@ class TutorialAcceptReviewView(APIView):
         new_achievements = review.user.check_and_award_achievements()
         send_user_stats(review.user)
         send_achievements(review.user.id, new_achievements)
+        send_tutorial_review_accepted(review.user.id, tutorial.id, tutorial.name, tutorial.reward_skill.name)
 
         logger.info("Tutorial %d review accepted for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
         return Response({
@@ -264,6 +265,7 @@ class TutorialDeclineReviewView(APIView):
         TutorialPartSubmission.objects.filter(progress=progress).delete()
         progress.datetime_finish = None
         progress.save()
+        send_tutorial_review_declined(review.user.id, tutorial.id, tutorial.name, review.decline_reason or '')
 
         logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, progress.user.id, request.user.id)
         return Response({"message": "Tutorial review declined, progress reset."}, status=status.HTTP_200_OK)

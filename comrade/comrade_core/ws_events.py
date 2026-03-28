@@ -74,6 +74,26 @@ def send_achievements(user_id: int, achievements: list):
     _send_to_user(user_id, event)
 
 
+def send_tutorial_review_accepted(user_id: int, tutorial_id: int, tutorial_name: str, reward_skill_name: str):
+    """Notify user their tutorial review was accepted."""
+    _send_to_user(user_id, {
+        "type": "tutorial_review_accepted",
+        "tutorialId": tutorial_id,
+        "tutorialName": tutorial_name,
+        "rewardSkillName": reward_skill_name,
+    })
+
+
+def send_tutorial_review_declined(user_id: int, tutorial_id: int, tutorial_name: str, reason: str):
+    """Notify user their tutorial review was declined."""
+    _send_to_user(user_id, {
+        "type": "tutorial_review_declined",
+        "tutorialId": tutorial_id,
+        "tutorialName": tutorial_name,
+        "reason": reason,
+    })
+
+
 def send_friend_event(target_user_id: int, event: dict):
     """Send a friend-system event to a specific user."""
     _send_to_user(target_user_id, event)
