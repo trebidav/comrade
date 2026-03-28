@@ -278,6 +278,7 @@ export default function MapView({ user, onLogout }: Props) {
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
     tutorialReviewAccepted, clearTutorialReviewAccepted,
     tutorialReviewDeclined, clearTutorialReviewDeclined,
+    tasksChangedCounter,
   } = useLocationSocket({
     token,
     username: user.username,
@@ -380,6 +381,19 @@ export default function MapView({ user, onLogout }: Props) {
       fetchTasks()
     }
   }, [tutorialReviewDeclined, clearTutorialReviewDeclined])
+
+  // ── Tasks changed broadcast from WebSocket — debounced re-fetch ──
+  useEffect(() => {
+    if (tasksChangedCounter === 0) return
+    const timer = setTimeout(() => fetchTasks(), 500)
+    return () => clearTimeout(timer)
+  }, [tasksChangedCounter, fetchTasks])
+
+  // ── Skill changes from user_stats → re-fetch tasks (new skills unlock new tasks) ──
+  useEffect(() => {
+    if (!currentUser.skills) return
+    fetchTasks()
+  }, [currentUser.skills.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTasks()

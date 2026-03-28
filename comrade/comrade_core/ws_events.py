@@ -20,7 +20,10 @@ def _display_name(user) -> str:
 
 
 def send_task_update(task, action: str, exclude_user_id: int | None = None):
-    """Broadcast task state change to owner and assignee (excluding the actor)."""
+    """Broadcast task state change to owner and assignee (excluding the actor).
+
+    Also sends tasks_changed to all connected users so their task lists refresh.
+    """
     event = {
         "type": "task_update",
         "taskId": task.id,
@@ -42,6 +45,8 @@ def send_task_update(task, action: str, exclude_user_id: int | None = None):
         recipients.discard(exclude_user_id)
     for uid in recipients:
         _send_to_user(uid, event)
+    # Notify all users that task list has changed
+    send_tasks_changed()
 
 
 def send_user_stats(user):
@@ -91,6 +96,19 @@ def send_tutorial_review_declined(user_id: int, tutorial_id: int, tutorial_name:
         "tutorialId": tutorial_id,
         "tutorialName": tutorial_name,
         "reason": reason,
+    })
+
+
+def send_tasks_changed():
+    """Broadcast to all connected users that the task list has changed.
+
+    This is a lightweight signal — the frontend debounces and re-fetches /api/tasks/.
+    Use for changes that affect task visibility across multiple users (e.g., task creation,
+    state changes, skill-based visibility changes).
+    """
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)('public_locations', {
+        "type": "tasks_changed",
     })
 
 

@@ -308,3 +308,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
 
     async def tutorial_review_declined(self, event):
         await self.send(text_data=json.dumps(event))
+
+    async def tasks_changed(self, event):
+        await self.send(text_data=json.dumps(event))

@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
-from ..ws_events import send_task_update, send_user_stats, send_achievements
+from ..ws_events import send_task_update, send_user_stats, send_achievements, send_tasks_changed
 
 logger = logging.getLogger(__name__)
 
@@ -463,6 +463,7 @@ class TaskCreateView(APIView):
             task.skill_execute.set(data['skill_execute'])
 
         response_serializer = TaskSerializer(task, context={'request': request})
+        send_tasks_changed()
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 

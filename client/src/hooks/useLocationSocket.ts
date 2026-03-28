@@ -127,6 +127,7 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [onlineFriendIds, setOnlineFriendIds] = useState<Set<number>>(new Set())
   const [tutorialReviewAccepted, setTutorialReviewAccepted] = useState<TutorialReviewAcceptedEvent[]>([])
   const [tutorialReviewDeclined, setTutorialReviewDeclined] = useState<TutorialReviewDeclinedEvent[]>([])
+  const [tasksChangedCounter, setTasksChangedCounter] = useState(0)
 
   const sendLocation = useCallback(
     (lat: number, lon: number, accuracy: number) => {
@@ -372,9 +373,19 @@ export function useLocationSocket({ token, username, userId }: Props) {
           case 'friend_request_received':
           case 'friend_request_accepted':
           case 'friend_request_rejected':
-          case 'friend_removed':
             setFriendEvents((prev) => [...prev, data as FriendEvent])
             break
+
+          case 'friend_removed': {
+            const removedId = data.userId
+            setFriendEvents((prev) => [...prev, data as FriendEvent])
+            // Remove ghost marker from map
+            if (removedId != null) {
+              setFriends((prev) => { const next = new Map(prev); next.delete(removedId); return next })
+              setOnlineFriendIds((prev) => { const next = new Set(prev); next.delete(removedId); return next })
+            }
+            break
+          }
 
           case 'friend_details':
             // Handle the existing friend_details event (sent on friend accept)
@@ -400,6 +411,10 @@ export function useLocationSocket({ token, username, userId }: Props) {
               tutorialName: data.tutorialName,
               reason: data.reason,
             }])
+            break
+
+          case 'tasks_changed':
+            setTasksChangedCounter((c) => c + 1)
             break
 
           default:
@@ -430,5 +445,6 @@ export function useLocationSocket({ token, username, userId }: Props) {
     onlineFriendIds,
     tutorialReviewAccepted, clearTutorialReviewAccepted,
     tutorialReviewDeclined, clearTutorialReviewDeclined,
+    tasksChangedCounter,
   }
 }

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, TutorialPartSubmission, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
-from ..ws_events import send_user_stats, send_achievements, send_tutorial_review_accepted, send_tutorial_review_declined
+from ..ws_events import send_user_stats, send_achievements, send_tutorial_review_accepted, send_tutorial_review_declined, send_tasks_changed
 from .task import _serialize_achievements
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,7 @@ class TutorialSubmitPartView(APIView):
                 new_achievements = request.user.check_and_award_achievements()
                 send_user_stats(request.user)
                 send_achievements(request.user.id, new_achievements)
+                send_tasks_changed()
                 logger.info("Tutorial %d completed by user %d (%s) — auto-accepted", tutorial.id, request.user.id, request.user.username)
                 return Response({
                     "completed": True,
@@ -230,6 +231,7 @@ class TutorialAcceptReviewView(APIView):
         send_user_stats(review.user)
         send_achievements(review.user.id, new_achievements)
         send_tutorial_review_accepted(review.user.id, tutorial.id, tutorial.name, tutorial.reward_skill.name)
+        send_tasks_changed()
 
         logger.info("Tutorial %d review accepted for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
         return Response({
@@ -272,6 +274,7 @@ class TutorialDeclineReviewView(APIView):
             TutorialPartSubmission.objects.filter(progress=progress).delete()
             progress.delete()
         send_tutorial_review_declined(review.user.id, tutorial.id, tutorial.name, review.decline_reason or '')
+        send_tasks_changed()
 
         logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
         return Response({"message": "Tutorial review declined, progress deleted."}, status=status.HTTP_200_OK)
@@ -382,4 +385,5 @@ class TutorialCreateView(APIView):
                         )
 
         logger.info("Tutorial %d created by user %d (%s)", tutorial.id, user.id, user.username)
+        send_tasks_changed()
         return Response({"message": "Tutorial created", "id": tutorial.id}, status=status.HTTP_201_CREATED)
