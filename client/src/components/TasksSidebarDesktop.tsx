@@ -53,7 +53,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
     t.is_tutorial ? (t.in_progress || t.tutorial_pending_review) : (t.state === 2 || t.state === 3 || t.state === 4) && t.assignee === userId
   )
   const ownedTasks = tasks
-    .filter((t) => (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
+    .filter((t) => (t.is_tutorial ? t.owner === userId : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
       const aReview = a.is_tutorial ? (a.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : a.state === 4 ? 0 : 1
       const bReview = b.is_tutorial ? (b.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : b.state === 4 ? 0 : 1
@@ -66,7 +66,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const startableTasks = tasks
     .filter((t) =>
       (t.is_tutorial
-        ? !t.in_progress && !t.tutorial_pending_review && (t.owner_pending_review_count ?? 0) === 0
+        ? !t.in_progress && !t.tutorial_pending_review && t.owner !== userId
         : t.owner !== userId && t.state !== 2 && t.state !== 3 && t.state !== 4 &&
           (t.state !== 5 || t.datetime_respawn != null)
       ) && inMaxRange(t)

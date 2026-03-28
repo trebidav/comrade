@@ -253,9 +253,12 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     tutorial_pending_review = serializers.SerializerMethodField()
     has_owner = serializers.SerializerMethodField()
 
+    owner = serializers.SerializerMethodField()
+
     def get_id(self, obj): return TUTORIAL_ID_OFFSET + obj.pk
     def get_is_tutorial(self, obj): return True
     def get_has_owner(self, obj): return obj.owner_id is not None
+    def get_owner(self, obj): return obj.owner_id
 
     def get_reward_skill_name(self, obj):
         return obj.reward_skill.name if obj.reward_skill else None
@@ -301,7 +304,7 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TutorialTask
-        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner', 'owner_pending_review_count']
+        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner', 'owner', 'owner_pending_review_count']
 
 
 class TutorialPartSubmissionSerializer(serializers.ModelSerializer):
