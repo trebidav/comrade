@@ -53,7 +53,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
     t.is_tutorial ? (t.in_progress || t.tutorial_pending_review) : (t.state === 2 || t.state === 3 || t.state === 4) && t.assignee === userId
   )
   const ownedTasks = tasks
-    .filter((t) => !t.is_tutorial && (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills))))
+    .filter((t) => (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
       const aReview = a.state === 4 ? 0 : 1
       const bReview = b.state === 4 ? 0 : 1
