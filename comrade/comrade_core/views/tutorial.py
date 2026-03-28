@@ -253,6 +253,7 @@ class TutorialDeclineReviewView(APIView):
             return Response({"error": "No pending review for this user"}, status=status.HTTP_404_NOT_FOUND)
 
         review.status = TutorialReview.Status.DECLINED
+        review.decline_reason = request.data.get('reason', '')
         review.save()
 
         # Reset progress — user must redo the tutorial
@@ -260,6 +261,7 @@ class TutorialDeclineReviewView(APIView):
         progress.review_status = TutorialProgress.ReviewStatus.DECLINED
         progress.state = TutorialProgress.State.IN_PROGRESS
         progress.completed_parts.clear()
+        TutorialPartSubmission.objects.filter(progress=progress).delete()
         progress.datetime_finish = None
         progress.save()
 

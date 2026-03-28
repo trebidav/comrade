@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.authtoken.models import Token
 
-from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialPartSubmission, OnboardingTemplate, UserOnboardingTutorial
+from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, TutorialPartSubmission, OnboardingTemplate, UserOnboardingTutorial
 
 
 class TaskTestCase(TestCase):
@@ -774,3 +774,44 @@ class TutorialPendingReviewTest(APITestCase):
         c.credentials(HTTP_AUTHORIZATION='Token ' + user_token.key)
         resp = c.get(f'/api/tutorial_task/{self.tutorial.id}/pending_review')
         self.assertEqual(resp.status_code, 403)
+
+
+class TutorialDeclineReasonTest(APITestCase):
+    """Test that decline stores reason and deletes submissions."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username='decline_owner', password='pass')
+        self.user = User.objects.create_user(username='decline_user', password='pass')
+        self.skill = Skill.objects.create(name='DeclineSkill')
+        self.tutorial = TutorialTask.objects.create(name='Decline Tutorial', reward_skill=self.skill, owner=self.owner)
+        self.part = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='freetext', title='Essay', order=0,
+            freetext_min_length=5, freetext_max_length=500,
+        )
+        # Complete tutorial as user
+        user_token = Token.objects.create(user=self.user)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION='Token ' + user_token.key)
+        c.post(f'/api/tutorial_task/{self.tutorial.id}/start', {'latitude': 0, 'longitude': 0})
+        c.post(f'/api/tutorial/{self.tutorial.id}/submit/{self.part.id}/', {'text': 'My long enough answer here'})
+        # Set up owner client
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.owner_token.key)
+
+    def test_decline_stores_reason(self):
+        resp = self.client.post(
+            f'/api/tutorial_task/{self.tutorial.id}/decline_review',
+            {'user_id': self.user.id, 'reason': 'Certificate expired'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        review = TutorialReview.objects.get(tutorial=self.tutorial, user=self.user)
+        self.assertEqual(review.decline_reason, 'Certificate expired')
+
+    def test_decline_deletes_submissions(self):
+        self.assertTrue(TutorialPartSubmission.objects.filter(progress__user=self.user).exists())
+        self.client.post(
+            f'/api/tutorial_task/{self.tutorial.id}/decline_review',
+            {'user_id': self.user.id, 'reason': 'Redo please'},
+        )
+        self.assertFalse(TutorialPartSubmission.objects.filter(progress__user=self.user, progress__tutorial=self.tutorial).exists())
