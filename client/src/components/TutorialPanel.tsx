@@ -181,11 +181,12 @@ function PartRenderer({ part, onSubmit, submitting }: {
   if (part.type === 'quiz') return <QuizPart part={part} onSubmit={onSubmit} submitting={submitting} />
   if (part.type === 'password') return <PasswordPart part={part} onSubmit={onSubmit} submitting={submitting} />
   if (part.type === 'file_upload') return <FileUploadPart part={part} onSubmit={onSubmit} submitting={submitting} />
+  if (part.type === 'freetext') return <FreetextPart part={part} onSubmit={onSubmit} submitting={submitting} />
   return null
 }
 
 function PartHeader({ part }: { part: TutorialPart }) {
-  const icons: Record<string, string> = { text: 'Text', video: 'Video', quiz: 'Quiz', password: 'Code', file_upload: 'Upload' }
+  const icons: Record<string, string> = { text: 'Text', video: 'Video', quiz: 'Quiz', password: 'Code', file_upload: 'Upload', freetext: 'Text' }
   return (
     <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--pip-border)' }}>
       <span style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -353,6 +354,42 @@ function FileUploadPart({ part, onSubmit, submitting }: { part: TutorialPart; on
       </label>
       <button className="pip-btn pip-btn-primary" onClick={handleSubmit} disabled={submitting || !file} style={{ width: '100%' }}>
         {submitting ? 'Uploading...' : 'Upload File'}
+      </button>
+    </div>
+  )
+}
+
+function FreetextPart({ part, onSubmit, submitting }: { part: TutorialPart; onSubmit: SubmitFn; submitting: boolean }) {
+  const [text, setText] = useState('')
+  const min = part.freetext_min_length ?? 0
+  const max = part.freetext_max_length ?? 1000
+  const valid = text.length >= min && text.length <= max
+
+  return (
+    <div>
+      <PartHeader part={part} />
+      {part.text_content && (
+        <div style={{ fontSize: '0.85rem', color: 'var(--pip-text)', marginBottom: '14px', whiteSpace: 'pre-wrap' }}>{part.text_content}</div>
+      )}
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, max))}
+        placeholder="Type your answer..."
+        rows={5}
+        className="pip-input"
+        style={{ marginBottom: '4px', resize: 'none', width: '100%', minHeight: '120px' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--pip-green-dark)', marginBottom: '12px' }}>
+        <span>{min > 0 ? `Min ${min} characters` : ''}</span>
+        <span>{text.length}/{max}</span>
+      </div>
+      <button
+        className="pip-btn pip-btn-primary"
+        onClick={() => onSubmit(part.id, { text })}
+        disabled={submitting || !valid}
+        style={{ width: '100%' }}
+      >
+        {submitting ? 'Submitting...' : 'Submit'}
       </button>
     </div>
   )

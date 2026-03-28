@@ -145,11 +145,12 @@ function PartRenderer({ part, onSubmit, submitting }: {
   if (part.type === 'quiz') return <QuizPart part={part} onSubmit={onSubmit} submitting={submitting} />
   if (part.type === 'password') return <PasswordPart part={part} onSubmit={onSubmit} submitting={submitting} />
   if (part.type === 'file_upload') return <FileUploadPart part={part} onSubmit={onSubmit} submitting={submitting} />
+  if (part.type === 'freetext') return <FreetextPart part={part} onSubmit={onSubmit} submitting={submitting} />
   return null
 }
 
 function PartHeader({ part }: { part: TutorialPart }) {
-  const icons: Record<string, string> = { text: '📄', video: '▶', quiz: '?', password: '🔑', file_upload: '📎' }
+  const icons: Record<string, string> = { text: '📄', video: '▶', quiz: '?', password: '🔑', file_upload: '📎', freetext: '📝' }
   return (
     <div style={{ marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid var(--pip-border)' }}>
       <span style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -331,6 +332,53 @@ function FileUploadPart({ part, onSubmit, submitting }: { part: TutorialPart; on
         disabled={submitting || !file}
       >
         {submitting ? 'Uploading...' : 'Upload File'}
+      </button>
+    </div>
+  )
+}
+
+function FreetextPart({ part, onSubmit, submitting }: { part: TutorialPart; onSubmit: SubmitFn; submitting: boolean }) {
+  const [text, setText] = useState('')
+  const min = part.freetext_min_length ?? 0
+  const max = part.freetext_max_length ?? 1000
+  const valid = text.length >= min && text.length <= max
+
+  return (
+    <div>
+      <PartHeader part={part} />
+      {part.text_content && (
+        <div style={{ fontSize: '0.75rem', color: 'var(--pip-text)', marginBottom: '10px', whiteSpace: 'pre-wrap' }}>{part.text_content}</div>
+      )}
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, max))}
+        placeholder="Type your answer..."
+        rows={5}
+        style={{
+          width: '100%',
+          background: 'rgba(46,194,126,0.05)',
+          border: '1px solid var(--pip-border)',
+          color: 'var(--pip-text)',
+          fontFamily: 'var(--pip-font)',
+          fontSize: '0.72rem',
+          padding: '5px 7px',
+          boxSizing: 'border-box',
+          outline: 'none',
+          marginBottom: '4px',
+          resize: 'none',
+          minHeight: '100px',
+        }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--pip-green-dark)', marginBottom: '8px' }}>
+        <span>{min > 0 ? `Min ${min} characters` : ''}</span>
+        <span>{text.length}/{max}</span>
+      </div>
+      <button
+        className="pip-popup-btn pip-popup-btn-primary"
+        onClick={() => onSubmit(part.id, { text })}
+        disabled={submitting || !valid}
+      >
+        {submitting ? 'Submitting...' : 'Submit'}
       </button>
     </div>
   )
