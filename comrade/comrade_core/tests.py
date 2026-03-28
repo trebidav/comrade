@@ -417,8 +417,8 @@ class TutorialTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(skill, self.user.skills.all())
 
-    def test_reviewed_tutorial_decline_resets_progress(self):
-        """Tutorial decline resets progress so user can redo."""
+    def test_reviewed_tutorial_decline_deletes_progress(self):
+        """Tutorial decline deletes progress so user must pick it up again."""
         owner = User.objects.create_user(username='tutor2', password='pass')
         skill = Skill.objects.create(name='Declined')
         tutorial = TutorialTask.objects.create(name='Decline Test', reward_skill=skill, owner=owner)
@@ -438,9 +438,7 @@ class TutorialTest(TestCase):
         resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/decline_review', {'user_id': self.user.id})
         self.assertEqual(resp.status_code, 200)
 
-        progress = TutorialProgress.objects.get(user=self.user, tutorial=tutorial)
-        self.assertEqual(progress.state, TutorialProgress.State.IN_PROGRESS)
-        self.assertEqual(progress.completed_parts.count(), 0)
+        self.assertFalse(TutorialProgress.objects.filter(user=self.user, tutorial=tutorial).exists())
         self.assertNotIn(skill, self.user.skills.all())
 
     def test_welcome_accept_spawns_onboarding_tutorials(self):

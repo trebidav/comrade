@@ -243,6 +243,8 @@ export default function MapView({ user, onLogout }: Props) {
     friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     taskUpdates, clearTaskUpdates, userStats, clearUserStats,
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
+    tutorialReviewAccepted, clearTutorialReviewAccepted,
+    tutorialReviewDeclined, clearTutorialReviewDeclined,
   } = useLocationSocket({
     token,
     username: user.username,
@@ -316,6 +318,28 @@ export default function MapView({ user, onLogout }: Props) {
     setAchievementToasts((prev) => [...prev, ...wsAchievements])
     clearWsAchievements()
   }, [wsAchievements, clearWsAchievements])
+
+  // ── Tutorial review notifications from WebSocket ──
+  useEffect(() => {
+    if (tutorialReviewAccepted.length > 0) {
+      for (const ev of tutorialReviewAccepted) {
+        setError(`Tutorial "${ev.tutorialName}" approved! You earned ${ev.rewardSkillName}.`)
+      }
+      clearTutorialReviewAccepted()
+      fetchTasks()
+      api.get('/user/').then((res) => setCurrentUser(res.data)).catch(() => {})
+    }
+  }, [tutorialReviewAccepted, clearTutorialReviewAccepted])
+
+  useEffect(() => {
+    if (tutorialReviewDeclined.length > 0) {
+      for (const ev of tutorialReviewDeclined) {
+        setError(`Tutorial "${ev.tutorialName}" declined: ${ev.reason}`)
+      }
+      clearTutorialReviewDeclined()
+      fetchTasks()
+    }
+  }, [tutorialReviewDeclined, clearTutorialReviewDeclined])
 
   useEffect(() => {
     fetchTasks()

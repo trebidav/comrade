@@ -263,18 +263,15 @@ class TutorialDeclineReviewView(APIView):
         review.decline_reason = request.data.get('reason', '')
         review.save()
 
-        # Reset progress — user must redo the tutorial
-        progress = TutorialProgress.objects.get(user_id=user_id, tutorial=tutorial)
-        progress.review_status = TutorialProgress.ReviewStatus.DECLINED
-        progress.state = TutorialProgress.State.IN_PROGRESS
-        progress.completed_parts.clear()
-        TutorialPartSubmission.objects.filter(progress=progress).delete()
-        progress.datetime_finish = None
-        progress.save()
+        # Delete progress entirely — user must pick up the tutorial again
+        progress = TutorialProgress.objects.filter(user_id=user_id, tutorial=tutorial).first()
+        if progress:
+            TutorialPartSubmission.objects.filter(progress=progress).delete()
+            progress.delete()
         send_tutorial_review_declined(review.user.id, tutorial.id, tutorial.name, review.decline_reason or '')
 
-        logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, progress.user.id, request.user.id)
-        return Response({"message": "Tutorial review declined, progress reset."}, status=status.HTTP_200_OK)
+        logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
+        return Response({"message": "Tutorial review declined, progress deleted."}, status=status.HTTP_200_OK)
 
 
 class TutorialPendingReviewView(APIView):
