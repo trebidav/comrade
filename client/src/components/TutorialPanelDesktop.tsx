@@ -56,7 +56,12 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
 
   const handleAccept = async () => {
     if (!reviewData) return
-    await acceptTutorialReview(tutorialId, reviewData.user.id)
+    try {
+      await acceptTutorialReview(tutorialId, reviewData.user.id)
+    } catch {
+      setError('Failed to accept review')
+      return
+    }
     const next = await fetchPendingReview(tutorialId)
     if (next) {
       setReviewData(next)
@@ -69,7 +74,12 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
 
   const handleDecline = async () => {
     if (!reviewData || !declineReason.trim()) return
-    await declineTutorialReview(tutorialId, reviewData.user.id, declineReason)
+    try {
+      await declineTutorialReview(tutorialId, reviewData.user.id, declineReason)
+    } catch {
+      setError('Failed to decline review')
+      return
+    }
     setShowDeclineModal(false)
     setDeclineReason('')
     const next = await fetchPendingReview(tutorialId)

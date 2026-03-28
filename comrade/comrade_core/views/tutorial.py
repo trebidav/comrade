@@ -115,7 +115,7 @@ class TutorialSubmitPartView(APIView):
                 # Owner set — create review record and enter pending state
                 progress.review_status = TutorialProgress.ReviewStatus.PENDING
                 progress.save()
-                TutorialReview.objects.create(tutorial=tutorial, user=request.user)
+                TutorialReview.objects.get_or_create(tutorial=tutorial, user=request.user, status=TutorialReview.Status.PENDING)
                 logger.info("Tutorial %d completed by user %d (%s) — pending review by owner %d", tutorial.id, request.user.id, request.user.username, tutorial.owner_id)
                 return Response({
                     "completed": True,
@@ -203,13 +203,16 @@ class TutorialAcceptReviewView(APIView):
             return Response({"error": "Only the owner can accept reviews"}, status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get('user_id')
-        try:
-            review = TutorialReview.objects.get(
-                tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
-            )
-        except TutorialReview.DoesNotExist:
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+        if not review:
             return Response({"error": "No pending review for this user"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Mark all pending reviews for this user as accepted (handles duplicates)
+        TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).update(status=TutorialReview.Status.ACCEPTED)
         review.status = TutorialReview.Status.ACCEPTED
         review.save()
 
@@ -246,13 +249,16 @@ class TutorialDeclineReviewView(APIView):
             return Response({"error": "Only the owner can decline reviews"}, status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get('user_id')
-        try:
-            review = TutorialReview.objects.get(
-                tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
-            )
-        except TutorialReview.DoesNotExist:
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+        if not review:
             return Response({"error": "No pending review for this user"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Mark all pending reviews for this user as declined (handles duplicates)
+        TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).update(status=TutorialReview.Status.DECLINED, decline_reason=request.data.get('reason', ''))
         review.status = TutorialReview.Status.DECLINED
         review.decline_reason = request.data.get('reason', '')
         review.save()
