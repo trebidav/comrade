@@ -284,7 +284,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                         ↺ {formatCountdown(task.datetime_respawn)}
                       </span>
                     )}
-                    {task.pending_review && (
+                    {task.pending_review && task.owner === userId && (
                       <span
                         style={{
                           fontSize: '0.65rem',
