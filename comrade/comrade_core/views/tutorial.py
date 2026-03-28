@@ -6,10 +6,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, UserOnboardingTutorial
+from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, TutorialPartSubmission, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
-from ..ws_events import send_user_stats, send_achievements
+from ..ws_events import send_user_stats, send_achievements, send_tutorial_review_accepted, send_tutorial_review_declined, send_tasks_changed
 from .task import _serialize_achievements
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,18 @@ class TutorialSubmitPartView(APIView):
         # Mark part complete
         progress.completed_parts.add(part)
 
+        # Persist submission for reviewable part types
+        if part.type == TutorialPart.Type.FREETEXT:
+            TutorialPartSubmission.objects.update_or_create(
+                progress=progress, part=part,
+                defaults={'submitted_text': request.data.get('text', '')},
+            )
+        elif part.type == TutorialPart.Type.FILE_UPLOAD:
+            TutorialPartSubmission.objects.update_or_create(
+                progress=progress, part=part,
+                defaults={'submitted_file': request.FILES.get('file')},
+            )
+
         if progress.is_complete():
             progress.datetime_finish = now()
 
@@ -93,6 +105,7 @@ class TutorialSubmitPartView(APIView):
                 new_achievements = request.user.check_and_award_achievements()
                 send_user_stats(request.user)
                 send_achievements(request.user.id, new_achievements)
+                send_tasks_changed()
                 logger.info("Tutorial %d completed by user %d (%s) — auto-accepted", tutorial.id, request.user.id, request.user.username)
                 return Response({
                     "completed": True,
@@ -100,9 +113,11 @@ class TutorialSubmitPartView(APIView):
                     "new_achievements": _serialize_achievements(new_achievements),
                 })
             else:
-                # Owner set — enter pending review
+                # Owner set — create review record and enter pending state
                 progress.review_status = TutorialProgress.ReviewStatus.PENDING
                 progress.save()
+                TutorialReview.objects.get_or_create(tutorial=tutorial, user=request.user, status=TutorialReview.Status.PENDING)
+                send_tasks_changed()
                 logger.info("Tutorial %d completed by user %d (%s) — pending review by owner %d", tutorial.id, request.user.id, request.user.username, tutorial.owner_id)
                 return Response({
                     "completed": True,
@@ -121,6 +136,9 @@ class TutorialTaskStartView(APIView):
             tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if tutorial.owner == request.user:
+            return Response({"error": "Owner cannot start their own tutorial"}, status=status.HTTP_403_FORBIDDEN)
 
         # Use per-user onboarding location if available
         try:
@@ -167,11 +185,17 @@ class TutorialTaskAbandonView(APIView):
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        deleted, _ = TutorialProgress.objects.filter(
+        progress = TutorialProgress.objects.filter(
             user=request.user, tutorial=tutorial, state=TutorialProgress.State.IN_PROGRESS
-        ).delete()
-        if not deleted:
+        ).first()
+        if not progress:
             return Response({"error": "Tutorial not in progress"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Clean up submissions and orphaned reviews before deleting progress
+        TutorialPartSubmission.objects.filter(progress=progress).delete()
+        TutorialReview.objects.filter(tutorial=tutorial, user=request.user, status=TutorialReview.Status.PENDING).delete()
+        progress.delete()
+        send_tasks_changed()
 
         return Response({"message": "Tutorial abandoned."}, status=status.HTTP_200_OK)
 
@@ -180,6 +204,7 @@ class TutorialAcceptReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
+        """Accept a specific user's tutorial review. Requires user_id in request body."""
         try:
             tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
@@ -188,24 +213,34 @@ class TutorialAcceptReviewView(APIView):
         if tutorial.owner != request.user:
             return Response({"error": "Only the owner can accept reviews"}, status=status.HTTP_403_FORBIDDEN)
 
-        try:
-            progress = TutorialProgress.objects.get(
-                tutorial=tutorial, review_status=TutorialProgress.ReviewStatus.PENDING,
-            )
-        except TutorialProgress.DoesNotExist:
-            return Response({"error": "No pending review"}, status=status.HTTP_404_NOT_FOUND)
+        user_id = request.data.get('user_id')
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+        if not review:
+            return Response({"error": "No pending review for this user"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Mark all pending reviews for this user as accepted (handles duplicates)
+        TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).update(status=TutorialReview.Status.ACCEPTED)
+        review.status = TutorialReview.Status.ACCEPTED
+        review.save()
+
+        progress = TutorialProgress.objects.get(user_id=user_id, tutorial=tutorial)
         progress.review_status = TutorialProgress.ReviewStatus.ACCEPTED
         progress.state = TutorialProgress.State.DONE
         progress.save()
 
         # Award skill and check achievements
-        progress.user.skills.add(tutorial.reward_skill)
-        new_achievements = progress.user.check_and_award_achievements()
-        send_user_stats(progress.user)
-        send_achievements(progress.user.id, new_achievements)
+        review.user.skills.add(tutorial.reward_skill)
+        new_achievements = review.user.check_and_award_achievements()
+        send_user_stats(review.user)
+        send_achievements(review.user.id, new_achievements)
+        send_tutorial_review_accepted(review.user.id, tutorial.id, tutorial.name, tutorial.reward_skill.name)
+        send_tasks_changed()
 
-        logger.info("Tutorial %d review accepted for user %d by owner %d", tutorial.id, progress.user.id, request.user.id)
+        logger.info("Tutorial %d review accepted for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
         return Response({
             "message": "Tutorial review accepted, skill awarded.",
             "new_achievements": _serialize_achievements(new_achievements),
@@ -216,6 +251,7 @@ class TutorialDeclineReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
+        """Decline a specific user's tutorial review. Requires user_id in request body."""
         try:
             tutorial = TutorialTask.objects.get(pk=task_id)
         except TutorialTask.DoesNotExist:
@@ -224,22 +260,67 @@ class TutorialDeclineReviewView(APIView):
         if tutorial.owner != request.user:
             return Response({"error": "Only the owner can decline reviews"}, status=status.HTTP_403_FORBIDDEN)
 
+        user_id = request.data.get('user_id')
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+        if not review:
+            return Response({"error": "No pending review for this user"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Mark all pending reviews for this user as declined (handles duplicates)
+        TutorialReview.objects.filter(
+            tutorial=tutorial, user_id=user_id, status=TutorialReview.Status.PENDING,
+        ).update(status=TutorialReview.Status.DECLINED, decline_reason=request.data.get('reason', ''))
+        review.status = TutorialReview.Status.DECLINED
+        review.decline_reason = request.data.get('reason', '')
+        review.save()
+
+        # Delete progress entirely — user must pick up the tutorial again
+        progress = TutorialProgress.objects.filter(user_id=user_id, tutorial=tutorial).first()
+        if progress:
+            TutorialPartSubmission.objects.filter(progress=progress).delete()
+            progress.delete()
+        send_tutorial_review_declined(review.user.id, tutorial.id, tutorial.name, review.decline_reason or '')
+        send_tasks_changed()
+
+        logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, review.user.id, request.user.id)
+        return Response({"message": "Tutorial review declined, progress deleted."}, status=status.HTTP_200_OK)
+
+
+class TutorialPendingReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
         try:
-            progress = TutorialProgress.objects.get(
-                tutorial=tutorial, review_status=TutorialProgress.ReviewStatus.PENDING,
-            )
-        except TutorialProgress.DoesNotExist:
-            return Response({"error": "No pending review"}, status=status.HTTP_404_NOT_FOUND)
+            tutorial = TutorialTask.objects.get(pk=task_id)
+        except TutorialTask.DoesNotExist:
+            return Response({"error": "Tutorial not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Reset progress — user must redo the tutorial
-        progress.review_status = TutorialProgress.ReviewStatus.DECLINED
-        progress.state = TutorialProgress.State.IN_PROGRESS
-        progress.completed_parts.clear()
-        progress.datetime_finish = None
-        progress.save()
+        if tutorial.owner != request.user:
+            return Response({"error": "Only the owner can view reviews"}, status=status.HTTP_403_FORBIDDEN)
 
-        logger.info("Tutorial %d review declined for user %d by owner %d", tutorial.id, progress.user.id, request.user.id)
-        return Response({"message": "Tutorial review declined, progress reset."}, status=status.HTTP_200_OK)
+        review = TutorialReview.objects.filter(
+            tutorial=tutorial, status=TutorialReview.Status.PENDING,
+        ).order_by('created_at').first()
+
+        if not review:
+            return Response({"error": "No pending reviews"}, status=status.HTTP_404_NOT_FOUND)
+
+        progress = TutorialProgress.objects.get(user=review.user, tutorial=tutorial)
+        submissions = TutorialPartSubmission.objects.filter(
+            progress=progress, part__type__in=['freetext', 'file_upload'],
+        ).select_related('part').order_by('part__order')
+
+        from ..serializers import TutorialPartSubmissionSerializer
+        return Response({
+            "user": {
+                "id": review.user.id,
+                "username": review.user.username,
+                "profile_picture": review.user.profile_picture if hasattr(review.user, 'profile_picture') else None,
+            },
+            "submissions": TutorialPartSubmissionSerializer(submissions, many=True, context={'request': request}).data,
+            "created_at": review.created_at.isoformat(),
+        })
 
 
 class TutorialCreateView(APIView):
@@ -270,7 +351,7 @@ class TutorialCreateView(APIView):
             lat=data.get('lat'),
             lon=data.get('lon'),
             reward_skill=reward_skill,
-            owner=user,
+            owner=user if data.get('require_review', True) else None,
         )
 
         # Set prerequisite skills
@@ -311,4 +392,5 @@ class TutorialCreateView(APIView):
                         )
 
         logger.info("Tutorial %d created by user %d (%s)", tutorial.id, user.id, user.username)
+        send_tasks_changed()
         return Response({"message": "Tutorial created", "id": tutorial.id}, status=status.HTTP_201_CREATED)

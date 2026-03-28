@@ -50,23 +50,25 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   }
 
   const activeTasks = tasks.filter((t) =>
-    t.is_tutorial ? t.in_progress : (t.state === 2 || t.state === 3) && t.assignee === userId
+    t.is_tutorial ? (t.in_progress || t.tutorial_pending_review) : (t.state === 2 || t.state === 3 || t.state === 4) && t.assignee === userId
   )
   const ownedTasks = tasks
-    .filter((t) => !t.is_tutorial && (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills))))
+    .filter((t) => (t.is_tutorial ? t.owner === userId : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
-      const aReview = a.state === 4 ? 0 : 1
-      const bReview = b.state === 4 ? 0 : 1
-      if (aReview !== bReview) return aReview - bReview
-      if (!a.datetime_finish && !b.datetime_finish) return 0
-      if (!a.datetime_finish) return 1
-      if (!b.datetime_finish) return -1
-      return new Date(a.datetime_finish).getTime() - new Date(b.datetime_finish).getTime()
+      // 0 = needs review, 1 = active/open, 2 = done
+      const pri = (t: Task) => {
+        if (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4) return 0
+        if (t.is_tutorial ? false : t.state === 5) return 2
+        return 1
+      }
+      const pa = pri(a), pb = pri(b)
+      if (pa !== pb) return pa - pb
+      return 0
     })
   const startableTasks = tasks
     .filter((t) =>
       (t.is_tutorial
-        ? !t.in_progress
+        ? !t.in_progress && !t.tutorial_pending_review && t.owner !== userId
         : t.owner !== userId && t.state !== 2 && t.state !== 3 && t.state !== 4 &&
           (t.state !== 5 || t.datetime_respawn != null)
       ) && inMaxRange(t)
@@ -94,7 +96,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
 
   useEffect(() => {
     if (tasks.length > 0) {
-      const ownedInReview = ownedTasks.some((t) => t.state === 4)
+      const ownedInReview = ownedTasks.some((t) => t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4)
       if (ownedInReview) setView('owned')
       else if (activeTasks.length > 0) setView('active')
       else setView('all')
@@ -108,7 +110,10 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const tabs: { key: View; label: string }[] = [
     { key: 'all', label: 'Nearby' },
     { key: 'active', label: activeTasks.length > 0 ? `Active (${activeTasks.length})` : 'Active' },
-    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: ownedTasks.filter((t) => t.state === 4).length > 0 ? `Owned (${ownedTasks.filter((t) => t.state === 4).length})` : 'Owned' }] : []),
+    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: (() => {
+      const reviewCount = ownedTasks.filter((t) => t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4).length
+      return reviewCount > 0 ? `Owned (${reviewCount})` : 'Owned'
+    })() }] : []),
   ]
 
   const handleAccept = async () => {
@@ -216,7 +221,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   borderLeft: (task.is_tutorial ? task.in_progress : task.state === 2) ? '3px solid #FBBC05' : '3px solid transparent',
                   cursor: 'pointer',
                   transition: 'background 0.1s',
-                  opacity: task.state === 5 ? 0.4 : (near ? 1 : 0.45),
+                  opacity: task.state === 5 ? 0.4 : (task.state === 4 && task.assignee === userId) ? 0.45 : (task.is_tutorial && task.tutorial_pending_review) ? 0.45 : (near ? 1 : 0.45),
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.background = 'rgba(46, 194, 126, 0.08)'
@@ -237,7 +242,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                       minWidth: 0,
                     }}
                   >
-                    {task.is_tutorial && <span style={{ marginRight: '3px' }}>★</span>}{task.name}
+                    {task.is_tutorial && <span style={{ marginRight: '3px' }}>★</span>}{task.name}{(task.owner_pending_review_count ?? 0) > 0 && <span style={{ color: '#FBBC05', fontWeight: 'normal' }}> ({task.owner_pending_review_count})</span>}
                   </div>
                   {dist !== null && (
                     <span style={{ fontSize: '0.6rem', color: inProximity(task) ? 'var(--pip-green-dark)' : '#EA4335', marginLeft: '6px', flexShrink: 0 }}>
@@ -246,7 +251,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {!task.is_tutorial && task.state != null && (
+                  {!task.is_tutorial && task.state != null && !(task.pending_review && task.owner === userId) && (
                     <span
                       style={{
                         fontSize: '0.6rem',
@@ -262,7 +267,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   )}
                   {task.is_tutorial && (
                     <span style={{ fontSize: '0.6rem', padding: '1px 6px', border: '1px solid #FBBC05', color: '#FBBC05', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {task.in_progress ? 'In Progress' : 'Tutorial'}
+                      {task.tutorial_pending_review ? 'In Review' : task.in_progress ? 'In Progress' : 'Tutorial'}
                     </span>
                   )}
                   {task.minutes != null && (
@@ -307,7 +312,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                     </span>
                   )}
                   {/* Pending review badge */}
-                  {task.pending_review && (
+                  {task.pending_review && task.owner === userId && (
                     <span
                       style={{
                         fontSize: '0.55rem',

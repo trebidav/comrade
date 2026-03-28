@@ -253,6 +253,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [activeSheet, setActiveSheet] = useState<MainSheet>(null)
   const [showBugReport, setShowBugReport] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [reviewTask, setReviewTask] = useState<Task | null>(null)
   const [animatingTab, setAnimatingTab] = useState<MainSheet | 'map' | null>(null)
   const [chatUnread, setChatUnread] = useState(0)
   const activeSheetRef = useRef<MainSheet>(null)
@@ -275,6 +276,9 @@ export default function MapView({ user, onLogout }: Props) {
     friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     taskUpdates, clearTaskUpdates, userStats, clearUserStats,
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
+    tutorialReviewAccepted, clearTutorialReviewAccepted,
+    tutorialReviewDeclined, clearTutorialReviewDeclined,
+    tasksChangedCounter,
   } = useLocationSocket({
     token,
     username: user.username,
@@ -356,6 +360,41 @@ export default function MapView({ user, onLogout }: Props) {
     clearWsAchievements()
   }, [wsAchievements, clearWsAchievements])
 
+  // ── Tutorial review notifications from WebSocket ──
+  useEffect(() => {
+    if (tutorialReviewAccepted.length > 0) {
+      for (const ev of tutorialReviewAccepted) {
+        setError(`Tutorial "${ev.tutorialName}" approved! You earned ${ev.rewardSkillName}.`)
+      }
+      clearTutorialReviewAccepted()
+      fetchTasks()
+      api.get('/user/').then((res) => setCurrentUser(res.data)).catch(() => {})
+    }
+  }, [tutorialReviewAccepted, clearTutorialReviewAccepted])
+
+  useEffect(() => {
+    if (tutorialReviewDeclined.length > 0) {
+      for (const ev of tutorialReviewDeclined) {
+        setError(`Tutorial "${ev.tutorialName}" declined: ${ev.reason}`)
+      }
+      clearTutorialReviewDeclined()
+      fetchTasks()
+    }
+  }, [tutorialReviewDeclined, clearTutorialReviewDeclined])
+
+  // ── Tasks changed broadcast from WebSocket — debounced re-fetch ──
+  useEffect(() => {
+    if (tasksChangedCounter === 0) return
+    const timer = setTimeout(() => fetchTasks(), 500)
+    return () => clearTimeout(timer)
+  }, [tasksChangedCounter, fetchTasks])
+
+  // ── Skill changes from user_stats → re-fetch tasks (new skills unlock new tasks) ──
+  useEffect(() => {
+    if (!currentUser.skills) return
+    fetchTasks()
+  }, [currentUser.skills.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     fetchTasks()
     api.get('/settings/proximity/').then((res) => {
@@ -397,6 +436,13 @@ export default function MapView({ user, onLogout }: Props) {
     }
     // In-progress tutorials: show the tutorial panel instead of opening detail sheet
     if (task.is_tutorial && task.in_progress) {
+      setSelectedTask(null)
+      setActiveSheet(null)
+      return
+    }
+    // Owner review mode: open review panel on explicit click
+    if (task.is_tutorial && (task.owner_pending_review_count ?? 0) > 0) {
+      setReviewTask(task)
       setSelectedTask(null)
       setActiveSheet(null)
       return
@@ -700,6 +746,16 @@ export default function MapView({ user, onLogout }: Props) {
         )
       )}
 
+      {/* Owner review panel (opened from OWNED tab or map click, dismissible) */}
+      {reviewTask && (
+        <TutorialPanel
+          task={reviewTask}
+          onCompleted={() => { setReviewTask(null); fetchTasks() }}
+          onLocate={handleTaskClick}
+          onAction={handleTaskAction}
+        />
+      )}
+
       {/* Bottom Navigation — Tasks + Chat only */}
       <nav className="bottom-nav">
         {([
@@ -994,7 +1050,7 @@ function TaskDetailContent({
 
       {/* Action buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {task.is_tutorial && !task.in_progress && (
+        {task.is_tutorial && !task.in_progress && !isOwner && (
           <button
             className="pip-btn pip-btn-primary"
             onClick={() => onAction('start', task.id)}

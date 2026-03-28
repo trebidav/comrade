@@ -180,13 +180,35 @@ Tutorials are standalone learning tasks (separate from regular Tasks) that award
 | `file_upload` | File must be provided |
 | `freetext` | Text length must be between `freetext_min_length` (default 0) and `freetext_max_length` (default 1000) |
 
+**TutorialPartSubmission** — Persists freetext/file submissions for owner review.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `progress` | FK TutorialProgress | The user's tutorial progress |
+| `part` | FK TutorialPart | The tutorial part this submission belongs to |
+| `submitted_text` | Text | Freetext answer (for freetext parts) |
+| `submitted_file` | File | Uploaded file (for file_upload parts) |
+| `submitted_at` | DateTime | When the submission was made |
+
+Unique together on (`progress`, `part`).
+
 **TutorialProgress** — Tracks which parts a user has completed. Has a `review_status` field (`null`, `pending`, `accepted`, `declined`).
+
+**TutorialReview** — Created when a tutorial with an owner enters review. Includes an optional `decline_reason` field (text) populated when the owner declines, explaining why the submission was rejected.
 
 ### Completion Flow
 
 When all parts are done:
 - **No owner** → skill awarded immediately (current default behavior)
-- **Owner set** → `review_status` set to `pending`. Skill is NOT awarded until owner accepts via `POST /api/tutorial_task/<id>/accept_review`. If declined, progress is reset and user must redo the tutorial.
+- **Owner set** → freetext and file_upload submissions are persisted as `TutorialPartSubmission` records. `review_status` is set to `pending`. Skill is NOT awarded until owner accepts via `POST /api/tutorial_task/<id>/accept_review`. If declined (with optional `reason`), progress is reset and user must redo the tutorial. The decline reason is stored on the `TutorialReview.decline_reason` field.
+
+### Owner Review Mode
+
+Tutorial owners can review pending submissions from the frontend:
+1. Owner opens the **OWNED** tab in the task sidebar
+2. Clicks a tutorial with pending reviews
+3. The **TutorialPanel** enters review mode, displaying all `TutorialPartSubmission` records (submitted text and files) for the oldest pending review
+4. Owner can **accept** (awards skill + rewards) or **decline** (with optional reason, resets progress)
 
 ### Onboarding Spawn System
 
@@ -328,6 +350,8 @@ On connect:
 | `friend_request_rejected` | views | `{userId}` |
 | `friend_removed` | views | `{userId}` |
 | `friend_details` | views | `{userId, name, friends, skills}` |
+| `tutorial_review_accepted` | ws_events | `{tutorialId, tutorialName, rewardSkillName}` |
+| `tutorial_review_declined` | ws_events | `{tutorialId, tutorialName, reason}` |
 | `preferences_updated` | Consumer | `{status, preferences}` |
 
 ### Location Broadcasting
@@ -475,7 +499,8 @@ All endpoints are prefixed with `/api/`.
 | POST | `/tutorial_task/<id>/abandon` | Abandon tutorial |
 | POST | `/tutorials/create` | Create tutorial with parts (admin/staff) |
 | POST | `/tutorial_task/<id>/accept_review` | Accept tutorial review (owner only) |
-| POST | `/tutorial_task/<id>/decline_review` | Decline tutorial review (owner only, resets progress) |
+| POST | `/tutorial_task/<id>/decline_review` | Decline tutorial review (owner only, resets progress). Accepts optional `reason` field. |
+| GET | `/tutorial_task/<id>/pending_review` | Get oldest pending review with submissions (owner only) |
 
 ### Friends
 
@@ -533,7 +558,7 @@ All endpoints are prefixed with `/api/`.
 - **TasksSidebar / TasksSidebarDesktop** — Filterable task list with distance, criticality, and skill matching
 - **ActiveTaskPanel / ActiveTaskPanelDesktop** — Current task with timer, pause/resume/finish actions
 - **CreateTaskModal / CreateTaskModalDesktop** — Admin/staff creation form with two tabs: Task (regular task) and Tutorial (with inline part creation including quiz/password/freetext)
-- **TutorialPanel / TutorialPanelDesktop** — Step-through tutorial UI with quiz/password/file upload handling
+- **TutorialPanel / TutorialPanelDesktop** — Step-through tutorial UI with quiz/password/file upload handling. Supports **review mode** for tutorial owners: displays submitted freetext/file answers and provides accept/decline (with optional reason) actions
 
 ### User & Social
 - **UserInfoPanel / UserInfoPanelDesktop** — Level bar, coins, XP, skills, streak display

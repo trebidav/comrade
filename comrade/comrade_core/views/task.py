@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from ..models import Task, Rating, Review, Skill, GlobalConfig, TutorialTask, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
 from ..serializers import TaskSerializer, SkillSerializer, TutorialTaskFlatSerializer, TaskCreateSerializer
 from ..utils import haversine_km
-from ..ws_events import send_task_update, send_user_stats, send_achievements
+from ..ws_events import send_task_update, send_user_stats, send_achievements, send_tasks_changed
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,9 @@ class TaskRateView(APIView):
         )
         new_achievements = request.user.check_and_award_achievements()
         send_achievements(request.user.id, new_achievements)
+        if new_achievements:
+            send_user_stats(request.user)
+            send_tasks_changed()
         return Response({"message": "Rating saved!", "new_achievements": _serialize_achievements(new_achievements)}, status=status.HTTP_200_OK)
 
 class TaskPauseView(APIView):
@@ -282,8 +285,12 @@ class TaskListView(APIView):
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         # ── Tutorial tasks ──
+        # Include: tutorials user hasn't completed (no reward skill) OR tutorials user owns
         tutorial_tasks_qs = (
-            TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
+            TutorialTask.objects.filter(
+                models.Q(owner=user)  # user owns this tutorial (always visible)
+                | ~models.Q(reward_skill__in=user.skills.all())  # user doesn't have skill yet
+            ).distinct()
             .select_related('reward_skill')
             .prefetch_related('skill_execute')
         )
@@ -459,6 +466,7 @@ class TaskCreateView(APIView):
             task.skill_execute.set(data['skill_execute'])
 
         response_serializer = TaskSerializer(task, context={'request': request})
+        send_tasks_changed()
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 

@@ -109,6 +109,41 @@ class TutorialProgress(models.Model):
         return total > 0 and self.completed_parts.count() >= total
 
 
+class TutorialReview(models.Model):
+    """Per-user review submission for tutorials with owners."""
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACCEPTED = 'accepted', 'Accepted'
+        DECLINED = 'declined', 'Declined'
+
+    tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='tutorial_reviews')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decline_reason = models.TextField(null=True, blank=True, help_text="Owner's reason when declining")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"TutorialReview: {self.user.username} – {self.tutorial.name} [{self.status}]"
+
+
+class TutorialPartSubmission(models.Model):
+    """Stores freetext/file submissions per part for owner review."""
+    progress = models.ForeignKey(TutorialProgress, on_delete=models.CASCADE, related_name='submissions')
+    part = models.ForeignKey(TutorialPart, on_delete=models.CASCADE, related_name='submissions')
+    submitted_text = models.TextField(null=True, blank=True)
+    submitted_file = models.FileField(upload_to='tutorial_submissions/', null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['progress', 'part']
+
+    def __str__(self):
+        return f"Submission: {self.progress.user.username} – Part {self.part.order}"
+
+
 class OnboardingTemplate(models.Model):
     """Admin-configured template: which items to spawn when a user accepts T&C.
 

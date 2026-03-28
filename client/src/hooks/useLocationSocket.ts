@@ -73,6 +73,18 @@ export type FriendEvent =
   | { type: 'friend_request_rejected'; userId: number }
   | { type: 'friend_removed'; userId: number }
 
+export interface TutorialReviewAcceptedEvent {
+  tutorialId: number
+  tutorialName: string
+  rewardSkillName: string
+}
+
+export interface TutorialReviewDeclinedEvent {
+  tutorialId: number
+  tutorialName: string
+  reason: string
+}
+
 interface Props {
   token: string | null
   username: string
@@ -113,6 +125,9 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const [wsAchievements, setWsAchievements] = useState<WsAchievement[]>([])
   const [friendEvents, setFriendEvents] = useState<FriendEvent[]>([])
   const [onlineFriendIds, setOnlineFriendIds] = useState<Set<number>>(new Set())
+  const [tutorialReviewAccepted, setTutorialReviewAccepted] = useState<TutorialReviewAcceptedEvent[]>([])
+  const [tutorialReviewDeclined, setTutorialReviewDeclined] = useState<TutorialReviewDeclinedEvent[]>([])
+  const [tasksChangedCounter, setTasksChangedCounter] = useState(0)
 
   const sendLocation = useCallback(
     (lat: number, lon: number, accuracy: number) => {
@@ -204,6 +219,8 @@ export function useLocationSocket({ token, username, userId }: Props) {
   const clearUserStats = useCallback(() => setUserStats(null), [])
   const clearWsAchievements = useCallback(() => setWsAchievements([]), [])
   const clearFriendEvents = useCallback(() => setFriendEvents([]), [])
+  const clearTutorialReviewAccepted = useCallback(() => setTutorialReviewAccepted([]), [])
+  const clearTutorialReviewDeclined = useCallback(() => setTutorialReviewDeclined([]), [])
 
   useEffect(() => {
     if (!token) return
@@ -356,9 +373,19 @@ export function useLocationSocket({ token, username, userId }: Props) {
           case 'friend_request_received':
           case 'friend_request_accepted':
           case 'friend_request_rejected':
-          case 'friend_removed':
             setFriendEvents((prev) => [...prev, data as FriendEvent])
             break
+
+          case 'friend_removed': {
+            const removedId = data.userId
+            setFriendEvents((prev) => [...prev, data as FriendEvent])
+            // Remove ghost marker from map
+            if (removedId != null) {
+              setFriends((prev) => { const next = new Map(prev); next.delete(removedId); return next })
+              setOnlineFriendIds((prev) => { const next = new Set(prev); next.delete(removedId); return next })
+            }
+            break
+          }
 
           case 'friend_details':
             // Handle the existing friend_details event (sent on friend accept)
@@ -368,6 +395,26 @@ export function useLocationSocket({ token, username, userId }: Props) {
                 user: { id: data.userId, username: data.name ?? '' },
               }])
             }
+            break
+
+          case 'tutorial_review_accepted':
+            setTutorialReviewAccepted((prev) => [...prev, {
+              tutorialId: data.tutorialId,
+              tutorialName: data.tutorialName,
+              rewardSkillName: data.rewardSkillName,
+            }])
+            break
+
+          case 'tutorial_review_declined':
+            setTutorialReviewDeclined((prev) => [...prev, {
+              tutorialId: data.tutorialId,
+              tutorialName: data.tutorialName,
+              reason: data.reason,
+            }])
+            break
+
+          case 'tasks_changed':
+            setTasksChangedCounter((c) => c + 1)
             break
 
           default:
@@ -396,5 +443,8 @@ export function useLocationSocket({ token, username, userId }: Props) {
     wsAchievements, clearWsAchievements,
     friendEvents, clearFriendEvents,
     onlineFriendIds,
+    tutorialReviewAccepted, clearTutorialReviewAccepted,
+    tutorialReviewDeclined, clearTutorialReviewDeclined,
+    tasksChangedCounter,
   }
 }

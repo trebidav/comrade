@@ -1,6 +1,6 @@
 import datetime
 
-from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate
+from comrade_core.models import Task, User, Review, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialPartSubmission, OnboardingTemplate
 from rest_framework import serializers
 
 
@@ -250,9 +250,15 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     lon = serializers.SerializerMethodField()
 
     reward_skill_name = serializers.SerializerMethodField()
+    tutorial_pending_review = serializers.SerializerMethodField()
+    has_owner = serializers.SerializerMethodField()
+
+    owner = serializers.SerializerMethodField()
 
     def get_id(self, obj): return TUTORIAL_ID_OFFSET + obj.pk
     def get_is_tutorial(self, obj): return True
+    def get_has_owner(self, obj): return obj.owner_id is not None
+    def get_owner(self, obj): return obj.owner_id
 
     def get_reward_skill_name(self, obj):
         return obj.reward_skill.name if obj.reward_skill else None
@@ -270,7 +276,6 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
         in_progress_ids = self.context.get('in_progress_ids')
         if in_progress_ids is not None:
             return obj.pk in in_progress_ids
-        # Fallback for non-list contexts (e.g. detail views)
         request = self.context.get('request')
         if not request:
             return False
@@ -278,6 +283,43 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
             user=request.user, tutorial=obj, state=TutorialProgress.State.IN_PROGRESS
         ).exists()
 
+    def get_tutorial_pending_review(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return False
+        return TutorialProgress.objects.filter(
+            user=request.user, tutorial=obj,
+            review_status='pending',
+        ).exists()
+
+    def get_owner_pending_review_count(self, obj):
+        """Number of pending reviews for this tutorial (visible to owner)."""
+        request = self.context.get('request')
+        if not request or obj.owner_id != request.user.id:
+            return 0
+        from comrade_core.models import TutorialReview
+        return TutorialReview.objects.filter(tutorial=obj, status='pending').count()
+
+    owner_pending_review_count = serializers.SerializerMethodField()
+
     class Meta:
         model = TutorialTask
-        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name']
+        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner', 'owner', 'owner_pending_review_count']
+
+
+class TutorialPartSubmissionSerializer(serializers.ModelSerializer):
+    part_title = serializers.CharField(source='part.title', read_only=True)
+    part_type = serializers.CharField(source='part.type', read_only=True)
+    submitted_file_url = serializers.SerializerMethodField()
+
+    def get_submitted_file_url(self, obj):
+        if not obj.submitted_file:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.submitted_file.url)
+        return obj.submitted_file.url
+
+    class Meta:
+        model = TutorialPartSubmission
+        fields = ['part_id', 'part_title', 'part_type', 'submitted_text', 'submitted_file_url']

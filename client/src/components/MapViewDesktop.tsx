@@ -222,6 +222,7 @@ export default function MapView({ user, onLogout }: Props) {
   const [showAchievementsPanel, setShowAchievementsPanel] = useState(false)
   const [showBugReport, setShowBugReport] = useState(false)
   const [tileConfig, setTileConfig] = useState<TileConfig>(() => TILE_CONFIGS[getTheme()])
+  const [reviewTask, setReviewTask] = useState<Task | null>(null)
 
   // Apply persisted theme on mount and listen for changes
   useEffect(() => {
@@ -242,6 +243,9 @@ export default function MapView({ user, onLogout }: Props) {
     friends, publicUsers, chatMessages, selfLocation, locationError, sendChatMessage,
     taskUpdates, clearTaskUpdates, userStats, clearUserStats,
     wsAchievements, clearWsAchievements, friendEvents, clearFriendEvents, onlineFriendIds,
+    tutorialReviewAccepted, clearTutorialReviewAccepted,
+    tutorialReviewDeclined, clearTutorialReviewDeclined,
+    tasksChangedCounter,
   } = useLocationSocket({
     token,
     username: user.username,
@@ -316,6 +320,41 @@ export default function MapView({ user, onLogout }: Props) {
     clearWsAchievements()
   }, [wsAchievements, clearWsAchievements])
 
+  // ── Tutorial review notifications from WebSocket ──
+  useEffect(() => {
+    if (tutorialReviewAccepted.length > 0) {
+      for (const ev of tutorialReviewAccepted) {
+        setError(`Tutorial "${ev.tutorialName}" approved! You earned ${ev.rewardSkillName}.`)
+      }
+      clearTutorialReviewAccepted()
+      fetchTasks()
+      api.get('/user/').then((res) => setCurrentUser(res.data)).catch(() => {})
+    }
+  }, [tutorialReviewAccepted, clearTutorialReviewAccepted])
+
+  useEffect(() => {
+    if (tutorialReviewDeclined.length > 0) {
+      for (const ev of tutorialReviewDeclined) {
+        setError(`Tutorial "${ev.tutorialName}" declined: ${ev.reason}`)
+      }
+      clearTutorialReviewDeclined()
+      fetchTasks()
+    }
+  }, [tutorialReviewDeclined, clearTutorialReviewDeclined])
+
+  // ── Tasks changed broadcast from WebSocket — debounced re-fetch ──
+  useEffect(() => {
+    if (tasksChangedCounter === 0) return
+    const timer = setTimeout(() => fetchTasks(), 500)
+    return () => clearTimeout(timer)
+  }, [tasksChangedCounter, fetchTasks])
+
+  // ── Skill changes from user_stats → re-fetch tasks (new skills unlock new tasks) ──
+  useEffect(() => {
+    if (!currentUser.skills) return
+    fetchTasks()
+  }, [currentUser.skills.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     fetchTasks()
     api.get('/settings/proximity/').then((res) => {
@@ -359,6 +398,10 @@ export default function MapView({ user, onLogout }: Props) {
       setTimeout(() => {
         markerRefs.current.get(task.id)?.openPopup()
       }, 300)
+    }
+    // Owner review mode: open review panel on explicit click
+    if (task.is_tutorial && (task.owner_pending_review_count ?? 0) > 0) {
+      setReviewTask(task)
     }
   }
 
@@ -611,6 +654,16 @@ export default function MapView({ user, onLogout }: Props) {
               />
             )
           })()}
+
+          {/* Owner review panel (opened from OWNED tab or map click, dismissible) */}
+          {reviewTask && (
+            <TutorialPanel
+              task={reviewTask}
+              onCompleted={() => { setReviewTask(null); fetchTasks() }}
+              onLocate={handleTaskClick}
+              onAction={handleTaskAction}
+            />
+          )}
 
           {/* Rating modal - shown after finishing a task */}
           {ratingTarget && (
@@ -909,7 +962,7 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
         {/* Tutorial actions */}
-        {task.is_tutorial && !task.in_progress && canStart && inProximity && (
+        {task.is_tutorial && !task.in_progress && !isOwner && canStart && inProximity && (
           <button className="pip-popup-btn pip-popup-btn-primary" onClick={() => onAction('start', task.id)}>
             Start
           </button>
@@ -930,7 +983,7 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
         )}
 
         {/* Regular task actions */}
-        {!task.is_tutorial && task.state === 1 && canStart && inProximity && (
+        {!task.is_tutorial && task.state === 1 && !isOwner && canStart && inProximity && (
           <button className="pip-popup-btn pip-popup-btn-primary" onClick={() => onAction('start', task.id)}>
             Start
           </button>

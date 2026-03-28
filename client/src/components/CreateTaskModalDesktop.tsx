@@ -53,6 +53,7 @@ export default function CreateTaskModalDesktop({ lat, lon, userSkills, onCreated
   const [tutDescription, setTutDescription] = useState('')
   const [tutRewardSkill, setTutRewardSkill] = useState<number | ''>('')
   const [tutSkillExecute, setTutSkillExecute] = useState<number[]>([])
+  const [tutRequireReview, setTutRequireReview] = useState(true)
   const [tutParts, setTutParts] = useState<TutorialPart[]>([])
   const [tutSubmitting, setTutSubmitting] = useState(false)
   const [tutError, setTutError] = useState('')
@@ -226,6 +227,7 @@ export default function CreateTaskModalDesktop({ lat, lon, userSkills, onCreated
         lon,
         reward_skill: tutRewardSkill || undefined,
         skill_execute: tutSkillExecute,
+        require_review: tutRequireReview,
         parts: tutParts.map((p) => {
           const base: Record<string, unknown> = { type: p.type, title: p.title }
           if (p.type === 'text') base.text_content = p.text_content
@@ -574,6 +576,15 @@ export default function CreateTaskModalDesktop({ lat, lon, userSkills, onCreated
 
               {/* Prerequisite Skills */}
               <AllSkillSelector label="Prerequisite Skills (who can start)" selected={tutSkillExecute} onChange={setTutSkillExecute} />
+
+              {/* Require Review toggle */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <span style={{ fontSize: '0.75rem' }}>Require Review</span>
+                <label className="pip-toggle">
+                  <input type="checkbox" checked={tutRequireReview} onChange={(e) => setTutRequireReview(e.target.checked)} />
+                  <span className="pip-toggle-slider" />
+                </label>
+              </div>
 
               {/* Parts */}
               <div style={{ marginBottom: '14px' }}>

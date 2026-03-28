@@ -50,23 +50,25 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   }
 
   const activeTasks = tasks.filter((t) =>
-    t.is_tutorial ? t.in_progress : (t.state === 2 || t.state === 3) && t.assignee === userId
+    t.is_tutorial ? (t.in_progress || t.tutorial_pending_review) : (t.state === 2 || t.state === 3 || t.state === 4) && t.assignee === userId
   )
   const ownedTasks = tasks
-    .filter((t) => !t.is_tutorial && (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills))))
+    .filter((t) => (t.is_tutorial ? t.owner === userId : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
-      const aReview = a.state === 4 ? 0 : 1
-      const bReview = b.state === 4 ? 0 : 1
-      if (aReview !== bReview) return aReview - bReview
-      if (!a.datetime_finish && !b.datetime_finish) return 0
-      if (!a.datetime_finish) return 1
-      if (!b.datetime_finish) return -1
-      return new Date(a.datetime_finish).getTime() - new Date(b.datetime_finish).getTime()
+      // 0 = needs review, 1 = active/open, 2 = done
+      const pri = (t: Task) => {
+        if (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4) return 0
+        if (t.is_tutorial ? false : t.state === 5) return 2
+        return 1
+      }
+      const pa = pri(a), pb = pri(b)
+      if (pa !== pb) return pa - pb
+      return 0
     })
   const startableTasks = tasks
     .filter((t) =>
       (t.is_tutorial
-        ? !t.in_progress
+        ? !t.in_progress && !t.tutorial_pending_review && t.owner !== userId
         : t.owner !== userId && t.state !== 2 && t.state !== 3 && t.state !== 4 &&
           (t.state !== 5 || t.datetime_respawn != null)
       ) && inMaxRange(t)
@@ -112,7 +114,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const tabs: { key: View; label: string; badge?: number }[] = [
     { key: 'all', label: 'Nearby', badge: startableTasks.length },
     { key: 'active', label: 'Active', badge: activeTasks.length },
-    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.state === 4).length || undefined }] : []),
+    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4).length || undefined }] : []),
   ]
 
   const handleAccept = async () => {
@@ -201,7 +203,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
               const canExecute = task.skill_execute_names.length === 0 || task.skill_execute_names.some((s) => userSkills.includes(s))
               const isReachable = view !== 'all' || (inProximity(task) && canExecute)
               const isActive = task.is_tutorial ? task.in_progress : task.state === 2
-              const greyed = !isReachable || task.state === 5
+              const greyed = !isReachable || task.state === 5 || (task.state === 4 && task.assignee === userId) || (task.is_tutorial && task.tutorial_pending_review)
 
               return (
                 <div
@@ -225,7 +227,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px' }}>
                     <div style={{ fontSize: '0.9rem', color: task.is_tutorial ? '#FBBC05' : 'var(--pip-text)', flex: 1, minWidth: 0, fontWeight: '500' }}>
-                      {task.name}
+                      {task.name}{(task.owner_pending_review_count ?? 0) > 0 && <span style={{ color: '#FBBC05', fontWeight: 'normal' }}> ({task.owner_pending_review_count})</span>}
                     </div>
                     {dist !== null && (
                       <span style={{
@@ -240,14 +242,14 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
-                    {!task.is_tutorial && task.state != null && (
+                    {!task.is_tutorial && task.state != null && !(task.pending_review && task.owner === userId) && (
                       <span className="state-badge" style={{ borderColor: STATE_COLORS[task.state], color: STATE_COLORS[task.state] }}>
                         {STATE_LABELS[task.state] ?? 'Unknown'}
                       </span>
                     )}
                     {task.is_tutorial && (
                       <span className="state-badge" style={{ borderColor: '#FBBC05', color: '#FBBC05' }}>
-                        {task.in_progress ? 'In Progress' : 'Tutorial'}
+                        {task.tutorial_pending_review ? 'In Review' : task.in_progress ? 'In Progress' : 'Tutorial'}
                       </span>
                     )}
                     {task.minutes != null && (
@@ -284,7 +286,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                         ↺ {formatCountdown(task.datetime_respawn)}
                       </span>
                     )}
-                    {task.pending_review && (
+                    {task.pending_review && task.owner === userId && (
                       <span
                         style={{
                           fontSize: '0.65rem',
