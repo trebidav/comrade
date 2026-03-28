@@ -587,7 +587,7 @@ export default function MapView({ user, onLogout }: Props) {
 
           {/* Active task panel - bottom center */}
           {(() => {
-            const activeTask = tasks.find((t) => t.is_tutorial ? t.in_progress : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
+            const activeTask = tasks.find((t) => t.is_tutorial ? (t.in_progress || (t.owner_pending_review_count ?? 0) > 0) : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
             if (!activeTask) return null
             if (activeTask.is_tutorial) return (
               <TutorialPanel

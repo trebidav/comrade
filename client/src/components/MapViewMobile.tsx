@@ -395,8 +395,8 @@ export default function MapView({ user, onLogout }: Props) {
     if (task.lat != null && task.lon != null) {
       window.dispatchEvent(new CustomEvent('pip-pan-to', { detail: { lat: task.lat, lon: task.lon } }))
     }
-    // In-progress tutorials: show the tutorial panel instead of opening detail sheet
-    if (task.is_tutorial && task.in_progress) {
+    // In-progress tutorials or owner review mode: show the tutorial panel instead of opening detail sheet
+    if (task.is_tutorial && (task.in_progress || (task.owner_pending_review_count ?? 0) > 0)) {
       setSelectedTask(null)
       setActiveSheet(null)
       return
@@ -433,7 +433,7 @@ export default function MapView({ user, onLogout }: Props) {
   const centerLat = selfLocation?.lat ?? user.latitude ?? 50.0755
   const centerLon = selfLocation?.lon ?? user.longitude ?? 14.4378
 
-  const activeTask = tasks.find((t) => t.is_tutorial ? t.in_progress : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
+  const activeTask = tasks.find((t) => t.is_tutorial ? (t.in_progress || (t.owner_pending_review_count ?? 0) > 0) : ((t.state === 2 || t.state === 3) && t.assignee === currentUser.id))
   const activeTaskCount = tasks.filter((t) => t.is_tutorial ? t.in_progress : (t.state === 2 || t.state === 3) && t.assignee === currentUser.id).length
 
   // Calculate FAB bottom offset (above active task bar if shown)
