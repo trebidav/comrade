@@ -289,6 +289,16 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
             review_status='pending',
         ).exists()
 
+    def get_owner_pending_review_count(self, obj):
+        """Number of pending reviews for this tutorial (visible to owner)."""
+        request = self.context.get('request')
+        if not request or obj.owner_id != request.user.id:
+            return 0
+        from comrade_core.models import TutorialReview
+        return TutorialReview.objects.filter(tutorial=obj, status='pending').count()
+
+    owner_pending_review_count = serializers.SerializerMethodField()
+
     class Meta:
         model = TutorialTask
-        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner']
+        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner', 'owner_pending_review_count']

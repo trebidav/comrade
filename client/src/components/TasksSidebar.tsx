@@ -240,7 +240,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
-                    {!task.is_tutorial && task.state != null && (
+                    {!task.is_tutorial && task.state != null && !(task.pending_review && task.owner === userId) && (
                       <span className="state-badge" style={{ borderColor: STATE_COLORS[task.state], color: STATE_COLORS[task.state] }}>
                         {STATE_LABELS[task.state] ?? 'Unknown'}
                       </span>

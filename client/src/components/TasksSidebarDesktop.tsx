@@ -246,7 +246,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {!task.is_tutorial && task.state != null && (
+                  {!task.is_tutorial && task.state != null && !(task.pending_review && task.owner === userId) && (
                     <span
                       style={{
                         fontSize: '0.6rem',

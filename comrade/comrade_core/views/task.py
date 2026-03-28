@@ -282,8 +282,18 @@ class TaskListView(APIView):
         task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         # ── Tutorial tasks ──
+        # Include: tutorials user hasn't completed (no reward skill) OR tutorials user owns with pending reviews
+        from ..models import TutorialReview
+        owned_with_pending = set(
+            TutorialReview.objects.filter(
+                tutorial__owner=user, status='pending',
+            ).values_list('tutorial_id', flat=True)
+        )
         tutorial_tasks_qs = (
-            TutorialTask.objects.exclude(reward_skill__in=user.skills.all())
+            TutorialTask.objects.filter(
+                models.Q(reward_skill__in=user.skills.all(), id__in=owned_with_pending)  # owned with pending
+                | ~models.Q(reward_skill__in=user.skills.all())  # user doesn't have skill
+            ).distinct()
             .select_related('reward_skill')
             .prefetch_related('skill_execute')
         )
