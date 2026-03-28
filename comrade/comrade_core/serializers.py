@@ -10,25 +10,48 @@ class UserDetailSerializer(serializers.ModelSerializer):
     level_progress = serializers.DictField(read_only=True)
 
     def get_skills(self, obj):
-        """Return skill names, excluding completed onboarding tutorial reward skills."""
-        # Get onboarding tutorial reward skill IDs
-        onboarding_reward_skill_ids = set(
+        """Return skill names, hiding onboarding reward skills only after ALL onboarding is complete."""
+        from comrade_core.models import UserOnboardingTutorial, UserOnboardingTask, Task
+
+        # Check if user has any spawned onboarding items
+        onboarding_tutorial_ids = set(
+            UserOnboardingTutorial.objects.filter(user=obj).values_list('tutorial_id', flat=True)
+        )
+        onboarding_task_ids = set(
+            UserOnboardingTask.objects.filter(user=obj).values_list('task_id', flat=True)
+        )
+
+        if not onboarding_tutorial_ids and not onboarding_task_ids:
+            # No onboarding spawned — show all skills
+            return [s.name for s in obj.skills.all()]
+
+        # Check if ALL onboarding is complete
+        completed_tutorial_ids = set(
+            TutorialProgress.objects.filter(
+                user=obj, state=TutorialProgress.State.DONE,
+                tutorial_id__in=onboarding_tutorial_ids,
+            ).values_list('tutorial_id', flat=True)
+        )
+        completed_task_ids = set(
+            Task.objects.filter(
+                id__in=onboarding_task_ids, state=Task.State.DONE,
+            ).values_list('id', flat=True)
+        )
+        all_done = (
+            onboarding_tutorial_ids == completed_tutorial_ids
+            and onboarding_task_ids == completed_task_ids
+        )
+
+        if not all_done:
+            # Still in onboarding — show all skills (needed for gating next tutorials)
+            return [s.name for s in obj.skills.all()]
+
+        # All onboarding complete — hide onboarding reward skills
+        hide_skill_ids = set(
             OnboardingTemplate.objects.filter(
                 is_active=True, tutorial__isnull=False,
             ).values_list('tutorial__reward_skill_id', flat=True)
         )
-        # Get completed onboarding tutorial IDs for this user
-        completed_tutorial_ids = set(
-            TutorialProgress.objects.filter(
-                user=obj, state=TutorialProgress.State.DONE,
-                tutorial__onboarding_templates__isnull=False,
-            ).values_list('tutorial_id', flat=True)
-        )
-        # Find which onboarding reward skills should be hidden (tutorial completed)
-        hide_skill_ids = set()
-        for tmpl in OnboardingTemplate.objects.filter(is_active=True, tutorial__isnull=False).select_related('tutorial'):
-            if tmpl.tutorial_id in completed_tutorial_ids and tmpl.tutorial.reward_skill_id in onboarding_reward_skill_ids:
-                hide_skill_ids.add(tmpl.tutorial.reward_skill_id)
         return [s.name for s in obj.skills.all() if s.id not in hide_skill_ids]
 
     class Meta:
