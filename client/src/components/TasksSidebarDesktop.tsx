@@ -242,7 +242,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                       minWidth: 0,
                     }}
                   >
-                    {task.is_tutorial && <span style={{ marginRight: '3px' }}>★</span>}{task.name}
+                    {task.is_tutorial && <span style={{ marginRight: '3px' }}>★</span>}{task.name}{(task.owner_pending_review_count ?? 0) > 0 && <span style={{ color: '#FBBC05', fontWeight: 'normal' }}> ({task.owner_pending_review_count})</span>}
                   </div>
                   {dist !== null && (
                     <span style={{ fontSize: '0.6rem', color: inProximity(task) ? 'var(--pip-green-dark)' : '#EA4335', marginLeft: '6px', flexShrink: 0 }}>
