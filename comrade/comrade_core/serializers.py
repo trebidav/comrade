@@ -10,10 +10,13 @@ class UserDetailSerializer(serializers.ModelSerializer):
     level_progress = serializers.DictField(read_only=True)
 
     def get_skills(self, obj):
-        """Return skill names, hiding onboarding reward skills only after ALL onboarding is complete."""
-        from comrade_core.models import UserOnboardingTutorial, UserOnboardingTask, Task
+        """Return skill names, hiding onboarding reward skills only after all onboarding tutorials are complete.
 
-        # Check if user has any spawned onboarding items
+        Only tutorials gate onboarding completion — tasks may respawn and shouldn't
+        re-trigger onboarding mode.
+        """
+        from comrade_core.models import UserOnboardingTutorial, UserOnboardingTask
+
         onboarding_tutorial_ids = set(
             UserOnboardingTutorial.objects.filter(user=obj).values_list('tutorial_id', flat=True)
         )
@@ -22,31 +25,31 @@ class UserDetailSerializer(serializers.ModelSerializer):
         )
 
         if not onboarding_tutorial_ids and not onboarding_task_ids:
-            # No onboarding spawned — show all skills
             return [s.name for s in obj.skills.all()]
 
-        # Check if ALL onboarding is complete
         completed_tutorial_ids = set(
             TutorialProgress.objects.filter(
                 user=obj, state=TutorialProgress.State.DONE,
                 tutorial_id__in=onboarding_tutorial_ids,
             ).values_list('tutorial_id', flat=True)
-        )
+        ) if onboarding_tutorial_ids else set()
         completed_task_ids = set(
-            Task.objects.filter(
-                id__in=onboarding_task_ids, state=Task.State.DONE,
-            ).values_list('id', flat=True)
-        )
+            UserOnboardingTask.objects.filter(
+                user=obj, completed=True,
+                task_id__in=onboarding_task_ids,
+            ).values_list('task_id', flat=True)
+        ) if onboarding_task_ids else set()
+
         all_done = (
             onboarding_tutorial_ids == completed_tutorial_ids
             and onboarding_task_ids == completed_task_ids
         )
 
         if not all_done:
-            # Still in onboarding — show all skills (needed for gating next tutorials)
+            # Still in onboarding — show all skills (needed for gating)
             return [s.name for s in obj.skills.all()]
 
-        # All onboarding complete — hide onboarding reward skills
+        # All onboarding tutorials complete — hide onboarding reward skills
         hide_skill_ids = set(
             OnboardingTemplate.objects.filter(
                 is_active=True, tutorial__isnull=False,

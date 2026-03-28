@@ -97,6 +97,29 @@ class TaskAdmin(admin.ModelAdmin):
         })
     )
 
+    def has_module_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner != request.user:
+            return False
+        return request.user.is_staff
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner != request.user:
+            return False
+        return request.user.is_staff
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -204,6 +227,29 @@ class TutorialTaskAdmin(admin.ModelAdmin):
     fields = ['name', 'description', 'lat', 'lon', 'reward_skill', 'skill_execute', 'owner']
     inlines = [TutorialPartInline]
 
+    def has_module_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner != request.user:
+            return False
+        return request.user.is_staff
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner != request.user:
+            return False
+        return request.user.is_staff
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -225,6 +271,18 @@ class TutorialPartAdmin(admin.ModelAdmin):
     def has_module_permission(self, request):
         return request.user.is_staff or request.user.is_superuser
 
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -238,6 +296,18 @@ class TutorialQuestionAdmin(admin.ModelAdmin):
     inlines = [TutorialAnswerInline]
 
     def has_module_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
         return request.user.is_staff or request.user.is_superuser
 
     def get_queryset(self, request):
