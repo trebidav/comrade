@@ -55,8 +55,8 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const ownedTasks = tasks
     .filter((t) => (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
-      const aReview = a.state === 4 ? 0 : 1
-      const bReview = b.state === 4 ? 0 : 1
+      const aReview = a.is_tutorial ? (a.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : a.state === 4 ? 0 : 1
+      const bReview = b.is_tutorial ? (b.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : b.state === 4 ? 0 : 1
       if (aReview !== bReview) return aReview - bReview
       if (!a.datetime_finish && !b.datetime_finish) return 0
       if (!a.datetime_finish) return 1
@@ -66,7 +66,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const startableTasks = tasks
     .filter((t) =>
       (t.is_tutorial
-        ? !t.in_progress
+        ? !t.in_progress && !t.tutorial_pending_review && (t.owner_pending_review_count ?? 0) === 0
         : t.owner !== userId && t.state !== 2 && t.state !== 3 && t.state !== 4 &&
           (t.state !== 5 || t.datetime_respawn != null)
       ) && inMaxRange(t)
@@ -112,7 +112,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const tabs: { key: View; label: string; badge?: number }[] = [
     { key: 'all', label: 'Nearby', badge: startableTasks.length },
     { key: 'active', label: 'Active', badge: activeTasks.length },
-    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.state === 4).length || undefined }] : []),
+    ...(ownedTasks.length > 0 ? [{ key: 'owned' as View, label: 'Owned', badge: ownedTasks.filter((t) => t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4).length || undefined }] : []),
   ]
 
   const handleAccept = async () => {
