@@ -55,13 +55,15 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   const ownedTasks = tasks
     .filter((t) => (t.is_tutorial ? t.owner === userId : (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills)))))
     .sort((a, b) => {
-      const aReview = a.is_tutorial ? (a.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : a.state === 4 ? 0 : 1
-      const bReview = b.is_tutorial ? (b.owner_pending_review_count ?? 0) > 0 ? 0 : 1 : b.state === 4 ? 0 : 1
-      if (aReview !== bReview) return aReview - bReview
-      if (!a.datetime_finish && !b.datetime_finish) return 0
-      if (!a.datetime_finish) return 1
-      if (!b.datetime_finish) return -1
-      return new Date(a.datetime_finish).getTime() - new Date(b.datetime_finish).getTime()
+      // 0 = needs review, 1 = active/open, 2 = done
+      const pri = (t: Task) => {
+        if (t.is_tutorial ? (t.owner_pending_review_count ?? 0) > 0 : t.state === 4) return 0
+        if (t.is_tutorial ? false : t.state === 5) return 2
+        return 1
+      }
+      const pa = pri(a), pb = pri(b)
+      if (pa !== pb) return pa - pb
+      return 0
     })
   const startableTasks = tasks
     .filter((t) =>
