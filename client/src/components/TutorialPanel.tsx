@@ -45,7 +45,8 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
       )
       if (res.data.completed) {
         if (res.data.pending_review) {
-          // Tutorial has owner — enter review state, don't close panel
+          // Tutorial has owner — enter review state, refetch task list + tutorial data
+          onCompleted(task.id, task.name)
           fetchTutorial()
         } else {
           if (res.data.new_achievements?.length && onNewAchievements) {

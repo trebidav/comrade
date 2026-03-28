@@ -307,7 +307,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                     </span>
                   )}
                   {/* Pending review badge */}
-                  {task.tutorial_pending_review && (
+                  {task.pending_review && (
                     <span
                       style={{
                         fontSize: '0.55rem',

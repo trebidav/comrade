@@ -44,6 +44,7 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
       )
       if (res.data.completed) {
         if (res.data.pending_review) {
+          onCompleted(task.id, task.name)
           fetchTutorial()
         } else {
           if (res.data.new_achievements?.length && onNewAchievements) {
