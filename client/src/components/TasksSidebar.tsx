@@ -201,7 +201,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
               const canExecute = task.skill_execute_names.length === 0 || task.skill_execute_names.some((s) => userSkills.includes(s))
               const isReachable = view !== 'all' || (inProximity(task) && canExecute)
               const isActive = task.is_tutorial ? task.in_progress : task.state === 2
-              const greyed = !isReachable || task.state === 5
+              const greyed = !isReachable || task.state === 5 || (task.state === 4 && task.assignee === userId) || (task.is_tutorial && task.tutorial_pending_review)
 
               return (
                 <div

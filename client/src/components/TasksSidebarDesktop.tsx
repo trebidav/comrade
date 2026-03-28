@@ -216,7 +216,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                   borderLeft: (task.is_tutorial ? task.in_progress : task.state === 2) ? '3px solid #FBBC05' : '3px solid transparent',
                   cursor: 'pointer',
                   transition: 'background 0.1s',
-                  opacity: task.state === 5 ? 0.4 : (near ? 1 : 0.45),
+                  opacity: task.state === 5 ? 0.4 : (task.state === 4 && task.assignee === userId) ? 0.45 : (task.is_tutorial && task.tutorial_pending_review) ? 0.45 : (near ? 1 : 0.45),
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.background = 'rgba(46, 194, 126, 0.08)'
