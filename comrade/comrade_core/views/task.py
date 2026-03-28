@@ -253,11 +253,14 @@ class TaskListView(APIView):
         tasks = []
         for t in tasks_qs:
             if t.id in onboarding_task_ids:
-                uo = user_onboarding_tasks.get(t.id)
-                if uo:
-                    t._user_lat = uo.lat
-                    t._user_lon = uo.lon
-                    tasks.append(t)
+                if onboarding_in_progress:
+                    # During onboarding, show with per-user location
+                    uo = user_onboarding_tasks.get(t.id)
+                    if uo:
+                        t._user_lat = uo.lat
+                        t._user_lon = uo.lon
+                        tasks.append(t)
+                # After onboarding complete: hide onboarding tasks entirely
             elif onboarding_in_progress:
                 # During onboarding, hide non-onboarding tasks
                 pass
@@ -276,11 +279,13 @@ class TaskListView(APIView):
         tutorial_tasks = []
         for t in tutorial_tasks_qs:
             if t.id in onboarding_tutorial_ids:
-                uo = user_onboarding_tutorials.get(t.id)
-                if uo:
-                    t._user_lat = uo.lat
-                    t._user_lon = uo.lon
-                    tutorial_tasks.append(t)
+                if onboarding_in_progress:
+                    uo = user_onboarding_tutorials.get(t.id)
+                    if uo:
+                        t._user_lat = uo.lat
+                        t._user_lon = uo.lon
+                        tutorial_tasks.append(t)
+                # After onboarding complete: hide onboarding tutorials entirely
             elif onboarding_in_progress:
                 # During onboarding, hide non-onboarding tutorials
                 pass
