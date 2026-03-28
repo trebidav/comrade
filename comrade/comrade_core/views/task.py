@@ -242,12 +242,24 @@ class TaskListView(APIView):
             )
 
         # ── Regular tasks ──
+        # After onboarding, exclude onboarding reward skills from visibility/permission checks
+        # so onboarding-gated tasks don't leak into the normal task list
+        if not onboarding_in_progress:
+            onboarding_skill_ids = set(
+                OnboardingTemplate.objects.filter(
+                    is_active=True, tutorial__isnull=False,
+                ).values_list('tutorial__reward_skill_id', flat=True)
+            )
+            effective_skills = user.skills.exclude(id__in=onboarding_skill_ids)
+        else:
+            effective_skills = user.skills.all()
+
         tasks_qs = Task.objects.filter(
             models.Q(owner=user)
             | models.Q(assignee=user)
-            | models.Q(state=Task.State.IN_REVIEW, skill_write__in=user.skills.all())
+            | models.Q(state=Task.State.IN_REVIEW, skill_write__in=effective_skills)
             | models.Q(skill_read__isnull=True)
-            | models.Q(skill_read__in=user.skills.all())
+            | models.Q(skill_read__in=effective_skills)
         ).distinct().select_related('owner', 'assignee').prefetch_related('skill_execute', 'skill_read', 'skill_write', 'reviews')
 
         tasks = []
