@@ -50,7 +50,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
   }
 
   const activeTasks = tasks.filter((t) =>
-    t.is_tutorial ? t.in_progress : (t.state === 2 || t.state === 3) && t.assignee === userId
+    t.is_tutorial ? (t.in_progress || t.tutorial_pending_review) : (t.state === 2 || t.state === 3 || t.state === 4) && t.assignee === userId
   )
   const ownedTasks = tasks
     .filter((t) => !t.is_tutorial && (t.owner === userId || (t.state === 4 && canReview(t, userId, userSkills))))
