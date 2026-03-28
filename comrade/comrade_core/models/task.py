@@ -175,6 +175,8 @@ class Task(models.Model):
         self.save()
 
     def _can_review(self, user) -> bool:
+        if self.owner is None:
+            return True  # No owner = auto-accept allowed by anyone
         if user == self.owner:
             return True
         if user == self.assignee:

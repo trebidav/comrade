@@ -117,8 +117,8 @@ OPEN (1) → IN_PROGRESS (2) → WAITING (3) → IN_PROGRESS (2)
 1. **Start** — User must have all `skill_execute` skills. Must be within `task_proximity_km` of the task location. Any other in-progress tasks for this user are auto-paused.
 2. **Pause** — Assignee only. Accumulates elapsed time. Enters WAITING state.
 3. **Resume** — Assignee only. Must be within proximity again. Resumes from WAITING.
-4. **Finish** — Owner or assignee. Optionally requires photo and/or comment. Creates a Review record. Enters IN_REVIEW.
-5. **Accept Review** — Owner or user with write skill. Awards coins/XP to assignee. Increments streak. Checks achievements. Schedules respawn if enabled. Enters DONE.
+4. **Finish** — Owner or assignee. Optionally requires photo and/or comment. Creates a Review record. Enters IN_REVIEW. **If the task has no owner, the review is auto-accepted immediately** — the task transitions straight to DONE with rewards in one step.
+5. **Accept Review** — Owner or user with write skill (or anyone if task has no owner). Awards coins/XP to assignee. Increments streak. Checks achievements. Schedules respawn if enabled. Enters DONE.
 6. **Decline Review** — Resets to OPEN, clears assignee.
 7. **Abandon** — Assignee only (from IN_PROGRESS or WAITING). Resets streak to 0. Resets to OPEN.
 
