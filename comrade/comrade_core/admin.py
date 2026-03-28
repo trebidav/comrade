@@ -23,7 +23,7 @@ class ComradeUserAdmin(UserAdmin):
     inlines = [UserAchievementInline]
     list_filter = ['location_sharing_level', 'is_staff', 'is_active']
     search_fields = ['username', 'email', 'first_name', 'last_name']
-    
+
     # Define fieldsets explicitly, extending the default UserAdmin fieldsets
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -51,6 +51,11 @@ class ComradeUserAdmin(UserAdmin):
         }),
     )
     filter_horizontal = ('skills', 'friends', 'friend_requests_sent', 'location_share_with')
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 class TaskAdmin(admin.ModelAdmin):
@@ -92,10 +97,26 @@ class TaskAdmin(admin.ModelAdmin):
         })
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(owner=request.user)
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.owner:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
 
 class SkillAdmin(admin.ModelAdmin):
     list_display = ['name']
     search_fields = ['name']
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 class GlobalConfigAdmin(admin.ModelAdmin):
@@ -108,12 +129,22 @@ class GlobalConfigAdmin(admin.ModelAdmin):
         ('Meta', {'fields': ('last_updated',)}),
     )
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 class RatingAdmin(admin.ModelAdmin):
     list_display = ['task', 'happiness', 'time']
     list_filter = ['task']
     search_fields = ['task__name']
     fields = ['task', 'happiness', 'time']
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 class ReviewAdmin(admin.ModelAdmin):
@@ -139,6 +170,11 @@ class ReviewAdmin(admin.ModelAdmin):
                 review.task.decline_review(request.user)
             except Exception:
                 pass
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 class TutorialAnswerInline(admin.TabularInline):
@@ -168,6 +204,17 @@ class TutorialTaskAdmin(admin.ModelAdmin):
     fields = ['name', 'description', 'lat', 'lon', 'reward_skill', 'skill_execute', 'owner']
     inlines = [TutorialPartInline]
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(owner=request.user)
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.owner:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
 
 class TutorialPartAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'type', 'tutorial', 'order']
@@ -175,11 +222,29 @@ class TutorialPartAdmin(admin.ModelAdmin):
     fields = ['tutorial', 'order', 'type', 'title', 'text_content', 'video_url', 'password', 'freetext_min_length', 'freetext_max_length']
     inlines = [TutorialQuestionInline]
 
+    def has_module_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(tutorial__owner=request.user)
+
 
 class TutorialQuestionAdmin(admin.ModelAdmin):
     list_display = ['text', 'part', 'order']
     fields = ['part', 'order', 'text']
     inlines = [TutorialAnswerInline]
+
+    def has_module_permission(self, request):
+        return request.user.is_staff or request.user.is_superuser
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(part__tutorial__owner=request.user)
 
 
 class TutorialProgressAdmin(admin.ModelAdmin):
@@ -190,6 +255,11 @@ class TutorialProgressAdmin(admin.ModelAdmin):
     def completed_count(self, obj):
         return f"{obj.completed_parts.count()} / {obj.tutorial.parts.count()}"
     completed_count.short_description = 'Progress'
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 class AchievementAdmin(admin.ModelAdmin):
@@ -203,6 +273,11 @@ class AchievementAdmin(admin.ModelAdmin):
         ('Rewards', {'fields': ('reward_coins', 'reward_xp', 'reward_skill')}),
     )
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 class UserAchievementAdmin(admin.ModelAdmin):
     list_display = ['user', 'achievement', 'datetime_earned', 'progress']
@@ -210,12 +285,22 @@ class UserAchievementAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'achievement__name']
     readonly_fields = ['datetime_earned']
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 class ChatMessageAdmin(admin.ModelAdmin):
     list_display = ['sender', 'text', 'created_at']
     list_filter = ['sender']
     search_fields = ['text', 'sender__username']
     readonly_fields = ['created_at']
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 admin.site.register(User, ComradeUserAdmin)
@@ -250,6 +335,11 @@ class BugReportAdmin(admin.ModelAdmin):
         return obj.description[:80] + ('...' if len(obj.description) > 80 else '')
     description_short.short_description = 'Description'
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 admin.site.register(BugReport, BugReportAdmin)
 
@@ -260,6 +350,11 @@ class OnboardingTemplateAdmin(admin.ModelAdmin):
     list_editable = ['is_active', 'order']
     list_filter = ['is_active']
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 class UserOnboardingTutorialAdmin(admin.ModelAdmin):
     list_display = ['user', 'tutorial', 'lat', 'lon', 'created_at']
@@ -267,12 +362,22 @@ class UserOnboardingTutorialAdmin(admin.ModelAdmin):
     search_fields = ['user__username']
     readonly_fields = ['user', 'tutorial', 'lat', 'lon', 'created_at']
 
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
+
 
 class UserOnboardingTaskAdmin(admin.ModelAdmin):
     list_display = ['user', 'task', 'lat', 'lon', 'created_at']
     list_filter = ['task']
     search_fields = ['user__username']
     readonly_fields = ['user', 'task', 'lat', 'lon', 'created_at']
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 admin.site.register(OnboardingTemplate, OnboardingTemplateAdmin)
