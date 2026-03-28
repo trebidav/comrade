@@ -44,11 +44,16 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
         data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
       )
       if (res.data.completed) {
-        if (res.data.new_achievements?.length && onNewAchievements) {
-          onNewAchievements(res.data.new_achievements)
+        if (res.data.pending_review) {
+          // Tutorial has owner — enter review state, don't close panel
+          fetchTutorial()
+        } else {
+          if (res.data.new_achievements?.length && onNewAchievements) {
+            onNewAchievements(res.data.new_achievements)
+          }
+          onCompleted(task.id, task.name)
+          setShowSheet(false)
         }
-        onCompleted(task.id, task.name)
-        setShowSheet(false)
       } else {
         fetchTutorial()
       }
@@ -69,8 +74,10 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
           <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--pip-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {task.name}
           </div>
-          <div style={{ fontSize: '0.65rem', color: '#4285F4' }}>
-            Tutorial · Step {progress + 1} of {total}
+          <div style={{ fontSize: '0.65rem', color: allDone ? '#FBBC05' : '#4285F4' }}>
+            {allDone
+              ? task.tutorial_pending_review ? 'Pending review' : 'Complete!'
+              : `Tutorial · Step ${Math.min(progress + 1, total)} of ${total}`}
           </div>
         </div>
         <div style={{ fontSize: '0.7rem', color: 'var(--pip-green-dark)', flexShrink: 0, paddingLeft: '8px' }}>
@@ -139,8 +146,20 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
                 <PartRenderer part={currentPart} onSubmit={submitPart} submitting={submitting} />
               )}
               {tutorial && allDone && (
-                <div style={{ fontSize: '1rem', color: 'var(--pip-green)', textAlign: 'center', padding: '24px 0' }}>
-                  ✓ All parts complete!
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  {task.tutorial_pending_review ? (
+                    <>
+                      <div style={{ fontSize: '1rem', color: '#FBBC05', marginBottom: 8 }}>⏳ Pending Review</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--pip-green-dark)' }}>
+                        All parts complete. The owner will review your submission.<br />
+                        You'll receive the <strong>{task.reward_skill_name}</strong> skill once approved.
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '1rem', color: 'var(--pip-green)' }}>
+                      ✓ All parts complete!
+                    </div>
+                  )}
                 </div>
               )}
             </div>

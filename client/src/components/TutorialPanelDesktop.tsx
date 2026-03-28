@@ -43,10 +43,14 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
         data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
       )
       if (res.data.completed) {
-        if (res.data.new_achievements?.length && onNewAchievements) {
-          onNewAchievements(res.data.new_achievements)
+        if (res.data.pending_review) {
+          fetchTutorial()
+        } else {
+          if (res.data.new_achievements?.length && onNewAchievements) {
+            onNewAchievements(res.data.new_achievements)
+          }
+          onCompleted(task.id, task.name)
         }
-        onCompleted(task.id, task.name)
       } else {
         fetchTutorial()
       }
@@ -99,7 +103,7 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
           {/* Progress bar */}
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '0.6rem', color: 'var(--pip-green-dark)', marginBottom: '3px' }}>
-              Step {progress + 1} of {total} — {tutorial.reward_skill_name} certification
+              {allDone ? task.tutorial_pending_review ? 'Pending review' : 'Complete!' : `Step ${Math.min(progress + 1, total)} of ${total}`} — {tutorial.reward_skill_name} certification
             </div>
             <div style={{ height: '3px', background: 'var(--pip-border)', borderRadius: '2px' }}>
               <div style={{ height: '100%', width: `${(progress / total) * 100}%`, background: 'var(--pip-green)', borderRadius: '2px', transition: 'width 0.3s' }} />
@@ -111,8 +115,17 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
       )}
 
       {tutorial && allDone && (
-        <div style={{ fontSize: '0.8rem', color: 'var(--pip-green)', textAlign: 'center', padding: '8px 0' }}>
-          All parts complete!
+        <div style={{ textAlign: 'center', padding: '8px 0' }}>
+          {task.tutorial_pending_review ? (
+            <>
+              <div style={{ fontSize: '0.85rem', color: '#FBBC05', marginBottom: 4 }}>⏳ Pending Review</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--pip-green-dark)' }}>
+                The owner will review your submission. You'll receive <strong>{task.reward_skill_name}</strong> once approved.
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '0.8rem', color: 'var(--pip-green)' }}>✓ All parts complete!</div>
+          )}
         </div>
       )}
     </div>

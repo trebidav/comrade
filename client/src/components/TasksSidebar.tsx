@@ -247,7 +247,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                     )}
                     {task.is_tutorial && (
                       <span className="state-badge" style={{ borderColor: '#FBBC05', color: '#FBBC05' }}>
-                        {task.in_progress ? 'In Progress' : 'Tutorial'}
+                        {task.tutorial_pending_review ? 'In Review' : task.in_progress ? 'In Progress' : 'Tutorial'}
                       </span>
                     )}
                     {task.minutes != null && (
@@ -284,7 +284,7 @@ export default function TasksSidebar({ tasks, userId, userSkills, selfLocation, 
                         ↺ {formatCountdown(task.datetime_respawn)}
                       </span>
                     )}
-                    {task.pending_review && (
+                    {task.tutorial_pending_review && (
                       <span
                         style={{
                           fontSize: '0.65rem',

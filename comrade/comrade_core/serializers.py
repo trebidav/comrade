@@ -250,9 +250,12 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
     lon = serializers.SerializerMethodField()
 
     reward_skill_name = serializers.SerializerMethodField()
+    tutorial_pending_review = serializers.SerializerMethodField()
+    has_owner = serializers.SerializerMethodField()
 
     def get_id(self, obj): return TUTORIAL_ID_OFFSET + obj.pk
     def get_is_tutorial(self, obj): return True
+    def get_has_owner(self, obj): return obj.owner_id is not None
 
     def get_reward_skill_name(self, obj):
         return obj.reward_skill.name if obj.reward_skill else None
@@ -270,7 +273,6 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
         in_progress_ids = self.context.get('in_progress_ids')
         if in_progress_ids is not None:
             return obj.pk in in_progress_ids
-        # Fallback for non-list contexts (e.g. detail views)
         request = self.context.get('request')
         if not request:
             return False
@@ -278,6 +280,15 @@ class TutorialTaskFlatSerializer(serializers.ModelSerializer):
             user=request.user, tutorial=obj, state=TutorialProgress.State.IN_PROGRESS
         ).exists()
 
+    def get_tutorial_pending_review(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return False
+        return TutorialProgress.objects.filter(
+            user=request.user, tutorial=obj,
+            review_status='pending',
+        ).exists()
+
     class Meta:
         model = TutorialTask
-        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name']
+        fields = ['id', 'is_tutorial', 'name', 'description', 'lat', 'lon', 'skill_execute_names', 'in_progress', 'reward_skill_name', 'tutorial_pending_review', 'has_owner']
