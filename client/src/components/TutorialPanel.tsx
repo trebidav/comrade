@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
 import api, { type Task, type TutorialData, type TutorialPart, type NewAchievement, realTaskId } from '../api'
+import { fetchPendingReview, acceptTutorialReview, declineTutorialReview, type TutorialReviewData } from '../api'
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 interface Props {
   task: Task
@@ -16,6 +26,14 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
   const [submitting, setSubmitting] = useState(false)
   const [showSheet, setShowSheet] = useState(false)
 
+  // Review mode state
+  const [reviewData, setReviewData] = useState<TutorialReviewData | null>(null)
+  const [reviewStep, setReviewStep] = useState(0)
+  const [showDeclineModal, setShowDeclineModal] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+  const [showFullPhoto, setShowFullPhoto] = useState(false)
+  const isReviewMode = (task.owner_pending_review_count ?? 0) > 0
+
   const tutorialId = realTaskId(task)
 
   const fetchTutorial = async () => {
@@ -30,6 +48,40 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
   }
 
   useEffect(() => { fetchTutorial() }, [tutorialId])
+
+  useEffect(() => {
+    if (isReviewMode) {
+      fetchPendingReview(tutorialId).then(setReviewData)
+    }
+  }, [isReviewMode, tutorialId])
+
+  const handleAccept = async () => {
+    if (!reviewData) return
+    await acceptTutorialReview(tutorialId, reviewData.user.id)
+    const next = await fetchPendingReview(tutorialId)
+    if (next) {
+      setReviewData(next)
+      setReviewStep(0)
+    } else {
+      setReviewData(null)
+      onCompleted(task.id, task.name)
+    }
+  }
+
+  const handleDecline = async () => {
+    if (!reviewData || !declineReason.trim()) return
+    await declineTutorialReview(tutorialId, reviewData.user.id, declineReason)
+    setShowDeclineModal(false)
+    setDeclineReason('')
+    const next = await fetchPendingReview(tutorialId)
+    if (next) {
+      setReviewData(next)
+      setReviewStep(0)
+    } else {
+      setReviewData(null)
+      onCompleted(task.id, task.name)
+    }
+  }
 
   const currentPart = tutorial?.parts.find((p) => !p.completed) ?? null
   const allDone = tutorial ? tutorial.parts.every((p) => p.completed) : false
@@ -64,6 +116,187 @@ export default function TutorialPanel({ task, onCompleted, onLocate, onAction, o
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Review mode: show sheet directly (no compact bar)
+  if (isReviewMode && reviewData) {
+    const currentSubmission = reviewStep < reviewData.submissions.length ? reviewData.submissions[reviewStep] : null
+    const isDecisionScreen = reviewStep >= reviewData.submissions.length
+
+    return (
+      <>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1600, background: 'rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <div style={{ background: 'var(--pip-panel-bg)', border: '1px solid var(--pip-border)', borderBottom: 'none', borderRadius: '14px 14px 0 0', maxHeight: '85dvh', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            {/* Header */}
+            <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid var(--pip-border)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.6rem', color: '#FBBC05', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>Review Submission</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{task.name}</div>
+                </div>
+                <button
+                  onClick={() => onCompleted(task.id, task.name)}
+                  style={{ background: 'none', border: 'none', color: 'var(--pip-text)', cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1, padding: '4px 8px', minHeight: '44px', display: 'flex', alignItems: 'center' }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Review banner: user info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
+                {reviewData.user.profile_picture ? (
+                  <img
+                    src={reviewData.user.profile_picture}
+                    alt={reviewData.user.username}
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--pip-border)' }}
+                  />
+                ) : (
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--pip-green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: 'var(--pip-text)', fontWeight: 'bold', border: '1px solid var(--pip-border)' }}>
+                    {reviewData.user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--pip-text)' }}>{reviewData.user.username}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)' }}>Submitted {timeAgo(reviewData.created_at)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '16px', WebkitOverflowScrolling: 'touch' }}>
+              {!isDecisionScreen && currentSubmission && (
+                <div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
+                    {currentSubmission.part_type === 'freetext' ? 'Text Response' : 'File Upload'}
+                  </div>
+                  {currentSubmission.part_title && (
+                    <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--pip-green)', marginBottom: '12px' }}>{currentSubmission.part_title}</div>
+                  )}
+
+                  {currentSubmission.part_type === 'freetext' && currentSubmission.submitted_text && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--pip-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--pip-border)', borderRadius: '6px', marginBottom: '16px' }}>
+                      {currentSubmission.submitted_text}
+                    </div>
+                  )}
+
+                  {currentSubmission.part_type === 'file_upload' && currentSubmission.submitted_file_url && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--pip-text)', marginBottom: '8px' }}>
+                        {currentSubmission.submitted_file_url.split('/').pop()}
+                      </div>
+                      <button
+                        className="pip-btn"
+                        onClick={() => setShowFullPhoto(true)}
+                        style={{ width: '100%', background: '#4285F4', color: 'white' }}
+                      >
+                        View Photo
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Navigation */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px' }}>
+                    <button
+                      className="pip-popup-btn"
+                      onClick={() => setReviewStep((s) => s - 1)}
+                      disabled={reviewStep === 0}
+                      style={{ opacity: reviewStep === 0 ? 0.4 : 1 }}
+                    >
+                      Previous
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)' }}>
+                      {reviewStep + 1} / {reviewData.submissions.length}
+                    </span>
+                    <button
+                      className="pip-popup-btn"
+                      onClick={() => setReviewStep((s) => s + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isDecisionScreen && (
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '12px' }}>Summary</div>
+                  {reviewData.submissions.map((sub, i) => (
+                    <div
+                      key={sub.part_id}
+                      onClick={() => setReviewStep(i)}
+                      style={{ padding: '10px', marginBottom: '8px', border: '1px solid var(--pip-border)', borderRadius: '6px', cursor: 'pointer', background: 'rgba(255,255,255,0.03)' }}
+                    >
+                      <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {sub.part_type === 'freetext' ? 'Text' : 'File'}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--pip-text)', marginTop: '2px' }}>
+                        {sub.part_title || `Part ${i + 1}`}
+                      </div>
+                      {sub.part_type === 'freetext' && sub.submitted_text && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {sub.submitted_text}
+                        </div>
+                      )}
+                      {sub.part_type === 'file_upload' && sub.submitted_file_url && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--pip-green-dark)', marginTop: '4px' }}>
+                          {sub.submitted_file_url.split('/').pop()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      className="pip-btn"
+                      onClick={() => setShowDeclineModal(true)}
+                      style={{ flex: 1, background: '#EA4335', color: 'white' }}
+                    >
+                      Decline
+                    </button>
+                    <button
+                      className="pip-btn"
+                      onClick={handleAccept}
+                      style={{ flex: 1, background: '#34A853', color: 'white' }}
+                    >
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Full photo overlay */}
+        {showFullPhoto && currentSubmission?.submitted_file_url && (
+          <div
+            onClick={() => setShowFullPhoto(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', cursor: 'pointer' }}
+          >
+            <img src={currentSubmission.submitted_file_url} style={{ maxWidth: '94vw', maxHeight: '88dvh', objectFit: 'contain' }} />
+          </div>
+        )}
+
+        {/* Decline modal */}
+        {showDeclineModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', padding: '16px' }}>
+            <div style={{ width: '100%', maxWidth: '360px', background: 'var(--pip-panel-bg)', border: '1px solid var(--pip-border)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--pip-text)', marginBottom: '4px' }}>Decline submission</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--pip-green-dark)', marginBottom: '12px' }}>{reviewData.user.username} will be notified and must redo the tutorial.</div>
+              <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} placeholder="Reason (required)" rows={3} className="pip-input" style={{ width: '100%', resize: 'none', marginBottom: '12px' }} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="pip-popup-btn" onClick={() => setShowDeclineModal(false)} style={{ flex: 1 }}>Cancel</button>
+                <button className="pip-btn" onClick={handleDecline} disabled={!declineReason.trim()} style={{ flex: 1, background: '#EA4335', color: 'white', opacity: declineReason.trim() ? 1 : 0.4 }}>Confirm Decline</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  if (isReviewMode && !reviewData) {
+    return null
   }
 
   return (
