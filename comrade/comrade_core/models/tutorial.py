@@ -109,6 +109,25 @@ class TutorialProgress(models.Model):
         return total > 0 and self.completed_parts.count() >= total
 
 
+class TutorialReview(models.Model):
+    """Per-user review submission for tutorials with owners."""
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACCEPTED = 'accepted', 'Accepted'
+        DECLINED = 'declined', 'Declined'
+
+    tutorial = models.ForeignKey(TutorialTask, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='tutorial_reviews')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"TutorialReview: {self.user.username} – {self.tutorial.name} [{self.status}]"
+
+
 class OnboardingTemplate(models.Model):
     """Admin-configured template: which items to spawn when a user accepts T&C.
 

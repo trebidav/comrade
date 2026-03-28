@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 
-from .models import Skill, Task, User, GlobalConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, Achievement, UserAchievement, ChatMessage, BugReport, BugReportScreenshot, OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
+from .models import Skill, Task, User, GlobalConfig, Rating, Review, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, Achievement, UserAchievement, ChatMessage, BugReport, BugReportScreenshot, OnboardingTemplate, UserOnboardingTutorial, UserOnboardingTask
 
 
 class UserChangeForm(UserChangeForm):
@@ -453,3 +453,12 @@ class UserOnboardingTaskAdmin(admin.ModelAdmin):
 admin.site.register(OnboardingTemplate, OnboardingTemplateAdmin)
 admin.site.register(UserOnboardingTutorial, UserOnboardingTutorialAdmin)
 admin.site.register(UserOnboardingTask, UserOnboardingTaskAdmin)
+
+class TutorialReviewAdmin(admin.ModelAdmin):
+    list_display = ['tutorial', 'user', 'status', 'created_at']
+    list_filter = ['status', 'tutorial']
+    search_fields = ['user__username', 'tutorial__name']
+    readonly_fields = ['created_at']
+
+admin.site.register(TutorialReview, TutorialReviewAdmin)
+

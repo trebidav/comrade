@@ -413,7 +413,7 @@ class TutorialTest(TestCase):
         owner_token = Token.objects.create(user=owner)
         owner_client = APIClient()
         owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
-        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/accept_review')
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/accept_review', {'user_id': self.user.id})
         self.assertEqual(resp.status_code, 200)
         self.assertIn(skill, self.user.skills.all())
 
@@ -435,7 +435,7 @@ class TutorialTest(TestCase):
         owner_token = Token.objects.create(user=owner)
         owner_client = APIClient()
         owner_client.credentials(HTTP_AUTHORIZATION='Token ' + owner_token.key)
-        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/decline_review')
+        resp = owner_client.post(f'/api/tutorial_task/{tutorial.id}/decline_review', {'user_id': self.user.id})
         self.assertEqual(resp.status_code, 200)
 
         progress = TutorialProgress.objects.get(user=self.user, tutorial=tutorial)
