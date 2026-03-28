@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, UserOnboardingTutorial
+from ..models import GlobalConfig, Skill, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialReview, TutorialPartSubmission, UserOnboardingTutorial
 from ..serializers import TutorialTaskDetailSerializer
 from ..utils import haversine_km
 from ..ws_events import send_user_stats, send_achievements
@@ -81,6 +81,18 @@ class TutorialSubmitPartView(APIView):
 
         # Mark part complete
         progress.completed_parts.add(part)
+
+        # Persist submission for reviewable part types
+        if part.type == TutorialPart.Type.FREETEXT:
+            TutorialPartSubmission.objects.update_or_create(
+                progress=progress, part=part,
+                defaults={'submitted_text': request.data.get('text', '')},
+            )
+        elif part.type == TutorialPart.Type.FILE_UPLOAD:
+            TutorialPartSubmission.objects.update_or_create(
+                progress=progress, part=part,
+                defaults={'submitted_file': request.FILES.get('file')},
+            )
 
         if progress.is_complete():
             progress.datetime_finish = now()

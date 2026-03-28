@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.authtoken.models import Token
 
-from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, OnboardingTemplate, UserOnboardingTutorial
+from comrade_core.models import Skill, Task, User, Review, Achievement, TutorialTask, TutorialPart, TutorialQuestion, TutorialAnswer, TutorialProgress, TutorialPartSubmission, OnboardingTemplate, UserOnboardingTutorial
 
 
 class TaskTestCase(TestCase):
@@ -680,3 +680,49 @@ class GlobalConfigAPITest(APITestCase):
         c.credentials(HTTP_AUTHORIZATION='Token ' + self.admin_token.key)
         resp = c.get('/api/settings/global/')
         self.assertEqual(resp.status_code, 200)
+
+
+class TutorialSubmissionPersistenceTest(APITestCase):
+    """Verify freetext and file submissions are persisted."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username='tut_owner', password='pass')
+        self.user = User.objects.create_user(username='tut_user', password='pass')
+        self.skill = Skill.objects.create(name='FirstAid')
+        self.tutorial = TutorialTask.objects.create(name='First Aid', reward_skill=self.skill, owner=self.owner)
+        self.freetext_part = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='freetext', title='Describe approach',
+            order=0, freetext_min_length=10, freetext_max_length=500,
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.token.key)
+        # Start the tutorial
+        self.client.post(f'/api/tutorial_task/{self.tutorial.id}/start', {'latitude': 0, 'longitude': 0})
+
+    def test_freetext_submission_persisted(self):
+        resp = self.client.post(
+            f'/api/tutorial/{self.tutorial.id}/submit/{self.freetext_part.id}/',
+            {'text': 'My approach is to check for safety first and then assess.'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        sub = TutorialPartSubmission.objects.get(
+            progress__user=self.user, part=self.freetext_part,
+        )
+        self.assertEqual(sub.submitted_text, 'My approach is to check for safety first and then assess.')
+        self.assertIsNone(sub.submitted_file.name if sub.submitted_file else None)
+
+    def test_file_upload_submission_persisted(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        file_part = TutorialPart.objects.create(
+            tutorial=self.tutorial, type='file_upload', title='Upload cert', order=1,
+        )
+        test_file = SimpleUploadedFile('cert.jpg', b'fake-image-content', content_type='image/jpeg')
+        resp = self.client.post(
+            f'/api/tutorial/{self.tutorial.id}/submit/{file_part.id}/',
+            {'file': test_file}, format='multipart',
+        )
+        self.assertEqual(resp.status_code, 200)
+        sub = TutorialPartSubmission.objects.get(progress__user=self.user, part=file_part)
+        self.assertIsNotNone(sub.submitted_file.name)
+        self.assertIn('cert', sub.submitted_file.name)
