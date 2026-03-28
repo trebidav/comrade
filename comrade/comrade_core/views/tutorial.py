@@ -135,6 +135,9 @@ class TutorialTaskStartView(APIView):
         except TutorialTask.DoesNotExist:
             return Response({"error": "Tutorial task not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if tutorial.owner == request.user:
+            return Response({"error": "Owner cannot start their own tutorial"}, status=status.HTTP_403_FORBIDDEN)
+
         # Use per-user onboarding location if available
         try:
             uo = UserOnboardingTutorial.objects.get(user=request.user, tutorial=tutorial)

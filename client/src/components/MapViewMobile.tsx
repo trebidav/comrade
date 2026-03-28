@@ -1036,7 +1036,7 @@ function TaskDetailContent({
 
       {/* Action buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {task.is_tutorial && !task.in_progress && (
+        {task.is_tutorial && !task.in_progress && !isOwner && (
           <button
             className="pip-btn pip-btn-primary"
             onClick={() => onAction('start', task.id)}

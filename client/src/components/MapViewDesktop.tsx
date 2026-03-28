@@ -948,7 +948,7 @@ function TaskPopupContent({ task, currentUserId, currentUserSkills, selfLocation
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
         {/* Tutorial actions */}
-        {task.is_tutorial && !task.in_progress && canStart && inProximity && (
+        {task.is_tutorial && !task.in_progress && !isOwner && canStart && inProximity && (
           <button className="pip-popup-btn pip-popup-btn-primary" onClick={() => onAction('start', task.id)}>
             Start
           </button>
